@@ -1,6 +1,9 @@
 /* frequency127 front-end SPA (vanilla) */
-const api = (path, opt={}) =>
-  fetch(path, Object.assign({headers:{'content-type':'application/json'}}, opt)).then(r=>r.json())
+const api = (path, opt = {}) =>
+  fetch(path, Object.assign({
+    headers: { 'content-type': 'application/json' },
+    credentials: 'include'
+  }, opt)).then(r => r.json());
 
 const $ = sel => document.querySelector(sel);
 const $$ = sel => [...document.querySelectorAll(sel)];
