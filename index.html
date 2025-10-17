@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>frequency127 — v3</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">frequency127</div>
+    <nav class="tabs" id="tabs">
+      <button data-tab="begin" class="tab active">Begin</button>
+      <button data-tab="guides" class="tab">Guides</button>
+      <button data-tab="unlocks" class="tab">Unlocks</button>
+      <button data-tab="settings" class="tab">Settings</button>
+    </nav>
+    <div class="profile" id="profile">
+      <div class="avatar" id="avatar"></div>
+      <span id="username"></span>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- AUTH -->
+    <section id="auth" class="card">
+      <div class="tabs mini" id="authTabs">
+        <button data-sub="login" class="tab active">Login</button>
+        <button data-sub="signup" class="tab">Sign up</button>
+      </div>
+      <form id="loginForm" class="stack">
+        <label>Username <input name="username" required autocomplete="username"></label>
+        <label>Passcode (4 digits) <input name="passcode" required minlength="4" maxlength="4" pattern="\d{4}" inputmode="numeric" autocomplete="current-password"></label>
+        <button>Login</button>
+      </form>
+      <form id="signupForm" class="stack hide">
+        <label>Username <input name="username" required autocomplete="username"></label>
+        <label>Passcode (4 digits) <input name="passcode" required minlength="4" maxlength="4" pattern="\d{4}" inputmode="numeric" autocomplete="new-password"></label>
+        <button>Create account</button>
+      </form>
+      <p class="muted">Login is only needed for routines. Guides (PDFs) are open.</p>
+    </section>
+
+    <!-- BEGIN -->
+    <section id="begin" class="grid two">
+      <div class="card">
+        <h3>Your routines</h3>
+        <div id="routineList" class="list"></div>
+      </div>
+
+      <div class="card">
+        <h3>New routine</h3>
+        <form id="newRoutine" class="stack">
+          <label>Name <input name="name" placeholder="Morning Reset" required></label>
+          <label class="inline">Default time (optional) <input name="time" placeholder="08:00" pattern="^\d{2}:\d{2}$"></label>
+          <label>Add steps</label>
+          <div class="chips">
+            <button data-step="box" type="button">Box breathing</button>
+            <button data-step="aff" type="button">Affirmations</button>
+            <button data-step="wl" type="button">White Light</button>
+          </div>
+          <div id="stepPreview" class="muted small"></div>
+          <button>Create routine</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- ROUTINE EDIT / RUNNER -->
+    <section id="routineEditor" class="card hide"></section>
+    <section id="runner" class="card modal hide">
+      <div id="runnerContent"></div>
+      <div class="actions">
+        <button id="runnerClose">Close</button>
+      </div>
+    </section>
+
+    <!-- GUIDES -->
+    <section id="guides" class="card hide">
+      <h3>Guides</h3>
+      <ul>
+        <li><a href="https://frequency127.com/pdfs/white-light.pdf" target="_blank">White‑Light Technique (PDF)</a></li>
+        <li><a href="https://frequency127.com/pdfs/dopamine-reset.pdf" target="_blank">Dopamine Reset (PDF)</a></li>
+      </ul>
+    </section>
+
+    <!-- UNLOCKS -->
+    <section id="unlocks" class="card hide">
+      <h3>Unlocks</h3>
+      <ul class="muted">
+        <li>Level 1 → Box Breathing</li>
+        <li>Level 2 → Affirmations cadence highlighter</li>
+        <li>Level 3 → White‑Light visual</li>
+      </ul>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="settings" class="card hide">
+      <h3>Settings</h3>
+      <div class="row">
+        <div>
+          <label>Theme</label>
+          <div class="chips">
+            <button class="theme" data-theme="violet" type="button">Violet</button>
+            <button class="theme" data-theme="indigo" type="button">Indigo</button>
+            <button class="theme" data-theme="teal" type="button">Teal</button>
+          </div>
+        </div>
+        <div>
+          <button id="logout" class="danger">Logout</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">Built for clarity. No fluff.</footer>
+
+  <script src="assets/app.js"></script>
+</body>
+</html>
