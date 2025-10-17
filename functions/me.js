@@ -4,16 +4,32 @@ export async function onRequest(context) {
     if (!env.DB) return j(500, { ok:false, error:'DB binding missing' });
     if (!env.JWT_SECRET) return j(401, { ok:false, error:'Not logged in' });
 
-    const token = readCookie(request.headers.get('cookie') || '', 'f127');
+    const cookies = request.headers.get('cookie') || '';
+    // Accept either cookie name to be resilient during transition
+    const token = readCookie(cookies, 'f127') || readCookie(cookies, 'auth');
     if (!token) return j(401, { ok:false, error:'Not logged in' });
 
     const payload = await verifyJWT(token, env.JWT_SECRET);
     if (!payload?.uid) return j(401, { ok:false, error:'Not logged in' });
 
-    const u = await env.DB.prepare('SELECT id, username, created_at, xp FROM users WHERE id=?').bind(payload.uid).first();
+    const u = await env.DB.prepare(
+      'SELECT id, username, COALESCE(xp,0) AS xp, created_at FROM users WHERE id=?'
+    ).bind(payload.uid).first();
     if (!u) return j(401, { ok:false, error:'Not logged in' });
 
-    return j(200, { ok:true, user:{ id:u.id, username:u.username, xp:u.xp ?? 0, created_at:u.created_at } });
+    // Return routines as the UI expects: name, id, xp, level (fake level=1 if you don’t store it)
+    const routines = await env.DB.prepare(
+      'SELECT id, name, created_at FROM routines WHERE user_id=? ORDER BY created_at DESC'
+    ).bind(u.id).all().then(r => r.results || []);
+
+    const shaped = routines.map(r => ({
+      id: r.id,
+      name: r.name,
+      xp: 0,       // if you don’t track per-routine xp yet
+      level: 1     // basic default so UI doesn’t break
+    }));
+
+    return j(200, { ok:true, user: u, routines: shaped });
   } catch (err) {
     console.error('me error:', err);
     return j(401, { ok:false, error:'Not logged in' });
