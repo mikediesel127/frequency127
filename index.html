@@ -37,7 +37,8 @@
 
         <form id="login-form" class="stack gap-md" autocomplete="on">
           <label class="field">
-            <input id="login-username" name="username" required minlength="3" maxlength="24" pattern="[a-zA-Z0-9_.~-]{3,24}" />
+            <!-- dropped fragile pattern to avoid Firefox RegExp warning -->
+            <input id="login-username" name="username" required minlength="3" maxlength="24" />
             <span>Username</span>
           </label>
           <label class="field">
@@ -52,7 +53,8 @@
 
         <form id="signup-form" class="stack gap-md" hidden autocomplete="on">
           <label class="field">
-            <input id="signup-username" name="username" required minlength="3" maxlength="24" pattern="[a-zA-Z0-9_.~-]{3,24}" />
+            <!-- dropped fragile pattern to avoid Firefox RegExp warning -->
+            <input id="signup-username" name="username" required minlength="3" maxlength="24" />
             <span>Username</span>
           </label>
           <label class="field">
