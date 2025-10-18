@@ -1,47 +1,22 @@
-export async function onRequest(context) {
-  const { env, request, params } = context;
-  try {
-    if (!env.DB) return J(500, { ok:false, error:'DB binding missing' });
-    if (!env.JWT_SECRET) return J(500, { ok:false, error:'JWT secret missing' });
+import { json, bad, requireAuth, dayKey } from "../../_utils.js";
 
-    const uid = await authUID(request, env.JWT_SECRET);
-    if (!uid) return J(401, { ok:false, error:'Not logged in' });
+export const onRequestPost = async (c) => {
+  const { env, params } = c;
+  const auth = requireAuth(c, env);
+  const user = await auth.getUser();
+  if (!user) return new Response("Unauthorized", { status: 401 });
 
-    const id = params?.id;
-    if (!id) return J(400, { ok:false, error:'Missing id' });
+  const r = await env.DB.prepare("SELECT id FROM routines WHERE id = ? AND user_id = ?").bind(params.id, user.id).first();
+  if (!r) return bad("Not found", 404);
 
-    // Verify routine belongs to user
-    const owns = await env.DB.prepare('SELECT 1 FROM routines WHERE id=? AND user_id=?').bind(id, uid).first();
-    if (!owns) return J(404, { ok:false, error:'Not found' });
+  const dk = dayKey();
+  const existing = await env.DB.prepare("SELECT id FROM routine_completions WHERE user_id = ? AND routine_id = ? AND day_key = ?").bind(user.id, params.id, dk).first();
+  if (existing) return json({ ok: true, xp: user.xp, already: true });
 
-    // Award XP + record completion (id UUID-ish)
-    const compId = crypto.randomUUID();
-    await env.DB.prepare(
-      'INSERT INTO routine_completions (id, routine_id, user_id, created_at, xp_awarded) VALUES (?, ?, ?, ?, ?)'
-    ).bind(compId, id, uid, Date.now(), 10).run();
-
-    await env.DB.prepare('UPDATE users SET xp = COALESCE(xp,0) + 10 WHERE id=?').bind(uid).run();
-
-    return J(200, { ok:true, awarded:10 });
-  } catch (err) {
-    console.error('routines/[id]/complete error:', err);
-    return J(500, { ok:false, error:'Server error' });
-  }
-}
-
-/* utils */
-function J(status, obj){return new Response(JSON.stringify(obj),{status,headers:{'content-type':'application/json'}})}
-function readCookie(all, name){const m=all.match(new RegExp('(?:^|; )'+name+'=([^;]+)'));return m?decodeURIComponent(m[1]):''}
-async function authUID(request, secret){
-  const token = readCookie(request.headers.get('cookie') || '', 'f127') || readCookie(request.headers.get('cookie') || '', 'auth');
-  if (!token) return null;
-  const enc=new TextEncoder();
-  const [h,b,s] = (token||'').split('.');
-  if (!h||!b||!s) return null;
-  const key = await crypto.subtle.importKey('raw', enc.encode(secret), {name:'HMAC',hash:'SHA-256'}, false, ['verify']);
-  const ok  = await crypto.subtle.verify('HMAC', key, b64urlToBuf(s), enc.encode(`${h}.${b}`));
-  if (!ok) return null;
-  try { const p = JSON.parse(atobUrl(b)); return p?.uid || null; } catch { return null; }
-}
-function b64urlToBuf(str){str=str.replace(/-/g,'+').replace(/_/g,'/');while(str.length%4)str+='=';const bin=atob(str);return new Uint8Array([...bin].map(c=>c.charCodeAt(0))).buffer}
-function atobUrl(str){str=str.replace(/-/g,'+').replace(/_/g,'/');while(str.length%4)str+='=';return atob(str)}
+  const xpGain = 10;
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO routine_completions (user_id, routine_id, day_key, created_at) VALUES (?, ?, ?, ?)").bind(user.id, params.id, dk, Date.now()),
+    env.DB.prepare("UPDATE users SET xp = xp + ? WHERE id = ?").bind(xpGain, user.id)
+  ]);
+  return json({ ok: true, xpGain });
+};

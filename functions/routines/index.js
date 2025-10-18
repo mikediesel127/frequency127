@@ -1,34 +1,43 @@
-import { json, parseBody, authUser, uid, now, qall } from '../_utils';
+import { json, bad, readJson, requireAuth, uid } from "../_utils.js";
 
-export async function onRequest(context) {
-  const { env, request } = context;
-  const user = await authUser(context);
-  if (!user) return json(401, { ok:false, error:'Not logged in' });
+export const onRequestGet = async (c) => {
+  const { env } = c;
+  const auth = requireAuth(c, env);
+  const user = await auth.getUser();
+  if (!user) return new Response("Unauthorized", { status: 401 });
 
-  if (request.method === 'GET') {
-    const list = await qall(
-      env,
-      'SELECT id, name, created_at FROM routines WHERE user_id=? ORDER BY created_at DESC',
-      user.id
-    );
-    return json(200, { ok:true, list });
-  }
+  const routines = await env.DB.prepare("SELECT id, name FROM routines WHERE user_id = ? ORDER BY created_at DESC").bind(user.id).all();
+  const stepRows = await env.DB.prepare("SELECT routine_id, type, ord FROM routine_steps WHERE user_id = ? ORDER BY ord ASC").bind(user.id).all();
 
-  if (request.method === 'POST') {
-    const body = await parseBody(request);
-    const id = uid();
-    await env.DB.prepare(
-      'INSERT INTO routines (id, user_id, name, time, created_at) VALUES (?,?,?,?,?)'
-    ).bind(id, user.id, body.name, body.time || null, now()).run();
+  const map = new Map();
+  for (const r of routines.results) map.set(r.id, { id: r.id, name: r.name, steps: [] });
+  for (const s of stepRows.results) map.get(s.routine_id)?.steps.push({ type: s.type });
 
-    const steps = Array.isArray(body.steps) ? body.steps : [];
-    for (let i = 0; i < steps.length; i++) {
-      await env.DB.prepare(
-        'INSERT INTO routine_steps (id, routine_id, ord, type, config) VALUES (?,?,?,?,?)'
-      ).bind(uid(), id, i, steps[i].type, JSON.stringify(steps[i])).run();
-    }
-    return json(200, { ok:true, id });
-  }
+  return json([...map.values()]);
+};
 
-  return json(405, { ok:false, error:'Method not allowed' });
-}
+export const onRequestPost = async (c) => {
+  const { env, request } = c;
+  const auth = requireAuth(c, env);
+  const user = await auth.getUser();
+  if (!user) return new Response("Unauthorized", { status: 401 });
+
+  const body = await readJson(request);
+  if (!body || typeof body.name !== "string" || !Array.isArray(body.steps)) return bad("Invalid payload");
+  const name = body.name.trim().slice(0,48);
+  if (!name) return bad("Name required");
+
+  const rid = uid();
+  const now = Date.now();
+  const batches = [
+    env.DB.prepare("INSERT INTO routines (id, user_id, name, created_at) VALUES (?, ?, ?, ?)").bind(rid, user.id, name, now)
+  ];
+  body.steps.slice(0,24).forEach((s, i) => {
+    if (!s || !s.type) return;
+    batches.push(env.DB.prepare("INSERT INTO routine_steps (id, user_id, routine_id, type, ord) VALUES (?, ?, ?, ?, ?)")
+      .bind(uid(), user.id, rid, String(s.type).slice(0,16), i));
+  });
+  await env.DB.batch(batches);
+
+  return json({ id: rid, name, steps: body.steps });
+};
