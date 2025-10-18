@@ -1,8 +1,15 @@
+// utils: JSON helpers, cookies, JWT (legacy-compatible), hashing, auth
+function b64url(str) {
+  return btoa(str).replace(/=+$/,"").replace(/\+/g,"-").replace(/\//g,"_");
+}
+function fromB64url(s) {
+  const pad = "=".repeat((4 - (s.length % 4)) % 4);
+  const b64 = (s + pad).replace(/-/g,"+").replace(/_/g,"/");
+  return atob(b64);
+}
+
 export function json(data = {}, init = {}) {
-  const headers = {
-    "content-type": "application/json; charset=utf-8",
-    "cache-control": "no-store"
-  };
+  const headers = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
   return new Response(JSON.stringify(data), { headers, ...init });
 }
 export function bad(msg = "Bad Request", code = 400) {
@@ -13,65 +20,48 @@ export async function readJson(req) {
 }
 export function dayKey(ts = Date.now()) {
   const d = new Date(ts);
-  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,"0"), da = String(d.getDate()).padStart(2,"0");
-  return `${y}-${m}-${da}`;
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
 export function setCookie(name, value, maxAge = 1209600) {
-  const base = [
+  return [
     `${name}=${value}; Path=/; HttpOnly; SameSite=Lax; Secure`,
     maxAge ? `Max-Age=${maxAge}` : ""
   ].filter(Boolean).join("; ");
-  return base;
 }
 export function clearCookie(name) {
   return `${name}=; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=0`;
 }
+
 export async function signJWT(payload, secret) {
-  const enc = new TextEncoder();
-  const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const body = btoa(JSON.stringify(payload));
+  // base64url for ALL segments (standard)
+  const header = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const body   = b64url(JSON.stringify(payload));
   const toSign = `${header}.${body}`;
-  const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name:"HMAC", hash:"SHA-256" }, false, ["sign"]);
   const sigBuf = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(toSign));
-  const sig = btoa(String.fromCharCode(...new Uint8Array(sigBuf))).replace(/=+$/,"").replace(/\+/g,"-").replace(/\//g,"_");
+  const sig = b64url(String.fromCharCode(...new Uint8Array(sigBuf)));
   return `${toSign}.${sig}`;
 }
 export async function verifyJWT(token, secret) {
   try{
-    const enc = new TextEncoder();
-    const [headerB64, bodyB64, sigB64] = token.split(".");
-    const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
-    const sig = Uint8Array.from(atob(sigB64.replace(/-/g,"+").replace(/_/g,"/")), c=>c.charCodeAt(0));
-    const ok = await crypto.subtle.verify("HMAC", key, sig, enc.encode(`${headerB64}.${bodyB64}`));
+    const [h, b, s] = token.split(".");
+    if (!h || !b || !s) return null;
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name:"HMAC", hash:"SHA-256" }, false, ["verify"]);
+    const ok = await crypto.subtle.verify("HMAC", key, Uint8Array.from(fromB64url(s), c=>c.charCodeAt(0)), new TextEncoder().encode(`${h}.${b}`));
     if (!ok) return null;
-    const payload = JSON.parse(atob(bodyB64));
+    const payload = JSON.parse(fromB64url(b));
     if (payload.exp && Date.now()/1000 > payload.exp) return null;
     return payload;
   }catch{ return null; }
 }
-export function requireAuth(c, env) {
-  return {
-    async getUser() {
-      const cookie = c.request.headers.get("Cookie") || "";
-      const match = cookie.match(/(?:^|;\s*)f127=([^;]+)/);
-      if (!match) return null;
-      const payload = await verifyJWT(decodeURIComponent(match[1]), env.JWT_SECRET);
-      if (!payload) return null;
-      const { user_id } = payload;
-      const user = await env.DB.prepare("SELECT id, username, xp, streak FROM users WHERE id = ?").bind(user_id).first();
-      return user || null;
-    }
-  };
-}
+
 export function sanitizeUsername(name) {
   if (typeof name !== "string") return null;
-  if (!/^[a-zA-Z0-9_.~-]{3,24}$/.test(name)) return null;
-  return name;
+  return /^[a-zA-Z0-9_.~-]{3,24}$/.test(name) ? name : null;
 }
 export function sanitizePasscode(p) {
   if (typeof p !== "string") return null;
-  if (!/^\d{4}$/.test(p)) return null;
-  return p;
+  return /^\d{4}$/.test(p) ? p : null;
 }
 export async function hashPass(passcode, salt) {
   const enc = new TextEncoder();
@@ -81,4 +71,25 @@ export async function hashPass(passcode, salt) {
 }
 export function uid() {
   return Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+// Auth helper that tolerates legacy token shapes
+export function requireAuth(c, env) {
+  return {
+    async getUser() {
+      const cookie = c.request.headers.get("Cookie") || "";
+      const match = cookie.match(/(?:^|;\s*)f127=([^;]+)/);
+      if (!match) return null;
+      const raw = decodeURIComponent(match[1]);
+      const payload = await verifyJWT(raw, env.JWT_SECRET);
+      if (!payload) return null;
+
+      // legacy payload fallback keys
+      const userId = payload.user_id || payload.uid || payload.sub || null;
+
+      if (!userId) return null;
+      const user = await env.DB.prepare("SELECT id, username, xp, streak FROM users WHERE id = ?").bind(userId).first();
+      return user || null;
+    }
+  };
 }
