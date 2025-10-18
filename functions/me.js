@@ -3,22 +3,26 @@ export async function onRequest(context) {
   if (!env.DB)  return J(500, { ok:false, error:'DB binding missing' });
   if (!env.JWT_SECRET) return J(401, { ok:false, error:'Not logged in' });
 
-  const token = readCookie(request.headers.get('cookie') || '', 'f127') || readCookie(request.headers.get('cookie') || '', 'auth');
+  const cookies = request.headers.get('cookie') || '';
+  const token = readCookie(cookies, 'f127') || readCookie(cookies, 'auth');
   if (!token) return J(401, { ok:false, error:'Not logged in' });
 
   const payload = await verifyJWT(token, env.JWT_SECRET);
   if (!payload?.uid) return J(401, { ok:false, error:'Not logged in' });
 
-  const u = await env.DB.prepare(
-    'SELECT id, username, COALESCE(xp,0) AS xp, created_at FROM users WHERE id=?'
-  ).bind(payload.uid).first();
+  const u = await env.DB
+    .prepare('SELECT id, username, COALESCE(xp,0) AS xp, created_at FROM users WHERE id=?')
+    .bind(payload.uid)
+    .first();
   if (!u) return J(401, { ok:false, error:'Not logged in' });
 
-  const rows = (await env.DB.prepare(
-    'SELECT id, name, created_at FROM routines WHERE user_id=? ORDER BY created_at DESC'
-  ).bind(u.id).all()).results || [];
+  const rows = (await env.DB
+    .prepare('SELECT id, name, created_at FROM routines WHERE user_id=? ORDER BY created_at DESC')
+    .bind(u.id)
+    .all()).results || [];
 
   const routines = rows.map(r => ({ id:r.id, name:r.name, xp:0, level:1 }));
+
   return J(200, { ok:true, user:u, routines });
 }
 
