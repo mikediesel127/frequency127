@@ -1,10 +1,10 @@
-/* Frequency127 – robust minimal client (DOM-safe) */
+/* Frequency127 – Frontend UX polish only (endpoints unchanged) */
 (() => {
-  // ---------- tiny utils ----------
-  const $ = (q, root = document) => root.querySelector(q);
-  const $$ = (q, root = document) => [...root.querySelectorAll(q)];
-  const on = (el, evt, fn) => { if (el) el.addEventListener(evt, fn); };
-  const setText = (el, v) => { if (el) el.textContent = v; };
+  // ---------- helpers ----------
+  const $  = (q, root=document) => root.querySelector(q);
+  const $$ = (q, root=document) => [...root.querySelectorAll(q)];
+  const on = (el, ev, fn) => el && el.addEventListener(ev, fn);
+  const set = (el, t) => { if (el) el.textContent = t; };
 
   const state = {
     me: null,
@@ -13,8 +13,7 @@
     run: { idx: 0, steps: [], routineId: null, routineName: "" }
   };
 
-  // ---------- fetch wrapper ----------
-  async function api(path, opts = {}) {
+  async function api(path, opts={}) {
     const res = await fetch(path, {
       method: opts.method || "GET",
       headers: { "content-type": "application/json" },
@@ -40,28 +39,39 @@
     if (next === "light") root.setAttribute("data-theme","light");
   }
 
-  // ---------- view flips ----------
+  // ---------- view toggles ----------
   function showAuth() {
-    const a = $("#auth-view"), s = $("#shell"), lo = $("#btn-logout");
-    if (a) a.hidden = false;
-    if (s) s.hidden = true;
-    if (lo) lo.hidden = true;
+    $("#auth-view")?.classList.remove("hidden");
+    if ($("#auth-view")) $("#auth-view").hidden = false;
+    if ($("#shell")) $("#shell").hidden = true;
+    if ($("#btn-logout")) $("#btn-logout").hidden = true;
   }
   function showShell() {
-    const a = $("#auth-view"), s = $("#shell"), lo = $("#btn-logout");
-    if (a) a.hidden = true;
-    if (s) s.hidden = false;
-    if (lo) lo.hidden = false;
+    if ($("#auth-view")) $("#auth-view").hidden = true;
+    if ($("#shell")) $("#shell").hidden = false;
+    if ($("#btn-logout")) $("#btn-logout").hidden = false;
   }
 
-  // ---------- renderers ----------
+  // ---------- render ----------
+  function renderStats() {
+    set($("#stat-xp"), state.me?.xp ?? 0);
+    set($("#stat-level"), 1 + Math.floor((state.me?.xp ?? 0) / 100));
+    set($("#stat-streak"), state.me?.streak ?? 0);
+    set($("#me-username"), state.me?.username ?? "");
+  }
+
+  function stepBadge(type){
+    const label = type === "box" ? "Box" : type === "affirm" ? "Affirm" : type === "white" ? "White" : type;
+    return `<span class="chip tiny">${label}</span>`;
+  }
+
   function renderRoutines() {
     const list = $("#routine-list");
     const empty = $("#empty-state");
     if (!list) return;
-
     list.innerHTML = "";
-    if (!state.routines?.length) {
+
+    if (!state.routines.length) {
       if (empty) empty.hidden = false;
       return;
     }
@@ -70,158 +80,125 @@
     const tpl = $("#tpl-routine-item")?.content;
     state.routines.forEach(r => {
       const node = tpl ? tpl.cloneNode(true) : document.createElement("li");
-      if (!tpl) node.className = "row item";
-      const title = node.querySelector?.(".title");
-      const steps = node.querySelector?.(".steps");
-      setText(title, r.name);
-      setText(steps, r.steps.map(s => s.type).join(" · "));
+      const titleEl = node.querySelector?.(".title");
+      const stepsLine = node.querySelector?.(".steps");
+      set(titleEl, r.name);
+      if (stepsLine) stepsLine.innerHTML = r.steps.map(s => s?.type).map(stepBadge).join(" ");
 
-      const btnRun  = node.querySelector?.(".run");
-      const btnEdit = node.querySelector?.(".edit");
-      const btnDel  = node.querySelector?.(".del");
-      if (btnRun)  btnRun.onclick  = () => startRun(r);
-      if (btnEdit) btnEdit.onclick = () => openEditor(r);
-      if (btnDel)  btnDel.onclick  = async () => {
+      // Expand/collapse
+      const item = node.querySelector(".item") || node;
+      const caret = node.querySelector(".caret");
+      const collapse = node.querySelector(".collapse");
+      on(caret, "click", () => item.classList.toggle("is-open"));
+
+      // Steps list inside collapse
+      const stepsUl = node.querySelector(".steps-list");
+      if (stepsUl) {
+        stepsUl.innerHTML = (r.steps || []).map(s => `<li class="chip">${s.type}</li>`).join("");
+      }
+
+      // Actions
+      const runBtn = node.querySelector(".run");
+      const editBtn = node.querySelector(".edit");
+      const delBtn = node.querySelector(".del");
+
+      if (runBtn) runBtn.onclick = () => startRun(r);
+      if (editBtn) editBtn.onclick = () => openEditor(r);
+      if (delBtn) delBtn.onclick = async () => {
         if (!confirm("Delete routine?")) return;
-        await api(`/routines/${r.id}`, { method: "DELETE" });
+        await api(`/routines/${r.id}`, { method:"DELETE" });
         await loadData();
       };
-      list.appendChild(node);
-    });
-  }
 
-  function renderStats() {
-    setText($("#stat-xp"),    state.me?.xp ?? 0);
-    setText($("#stat-level"), 1 + Math.floor((state.me?.xp ?? 0) / 100));
-    setText($("#stat-streak"), state.me?.streak ?? 0);
-    setText($("#me-username"), state.me?.username ?? "");
+      list.appendChild(item);
+    });
   }
 
   // ---------- data ----------
   async function loadData() {
-    const me = await api("/me");
-    state.me = me.user || null;
-    state.routines = me.routines || [];
-    renderRoutines();
+    const { user, routines, recent } = await api("/me");
+    state.me = user || null;
+    state.routines = routines || [];
     renderStats();
-    const recent = $("#recent-users");
-    if (recent) recent.innerHTML = (me.recent || []).map(u=>`<span class="chip">${u}</span>`).join("");
+    renderRoutines();
+    const recentWrap = $("#recent-users");
+    if (recentWrap) recentWrap.innerHTML = (recent || []).map(u=>`<span class="chip">${u}</span>`).join("");
     showShell();
   }
 
-  // ---------- tabs ----------
-  function wireTabs() {
-    $$(".tab").forEach(btn=>{
-      on(btn, "click", () => {
-        $$(".tab").forEach(b=>b.classList.remove("is-active"));
-        btn.classList.add("is-active");
-        const t = btn.dataset.tab;
-        $$(".tabpane").forEach(p=>p.classList.remove("is-active"));
-        const pane = $(`#tab-${t}`);
-        if (pane) pane.classList.add("is-active");
-      });
-    });
-  }
+  // ---------- Editor (modal) ----------
+  const editor = $("#routine-editor");
+  const queue  = $("#re-queue");
 
-  // ---------- editor ----------
-  const editor = () => $("#routine-editor");
-  const queue  = () => $("#re-queue");
-
-  function openEditor(r = null) {
-    const dlg = editor();
-    if (!dlg) return;
-    const title = $("#re-title");
-    const name  = $("#re-name");
-    const q     = queue();
-
-    setText(title, r ? "Edit routine" : "New routine");
+  function openEditor(r=null){
+    if (!editor) return;
+    set($("#re-title"), r ? "Edit routine" : "New routine");
+    const name = $("#re-name");
     if (name) name.value = r?.name || "";
-    if (q) q.innerHTML = "";
+    if (queue) queue.innerHTML = "";
+    (r?.steps || []).forEach(s=> pushStep(s.type));
+    editor.showModal();
 
-    (r?.steps || []).forEach(s => pushStep(s.type));
-    dlg.showModal();
-
-    dlg.onclose = () => { if (queue()) queue().innerHTML = ""; };
-
-    const btnSave = $("#re-save");
-    if (btnSave) btnSave.onclick = async (e) => {
+    const saveBtn = $("#re-save");
+    if (saveBtn) saveBtn.onclick = async (e)=>{
       e.preventDefault();
       const nm = name?.value.trim();
-      const steps = [...(q?.querySelectorAll("li") || [])].map(li=>({ type: li.dataset.type }));
+      const steps = [...(queue?.querySelectorAll("li") || [])].map(li=>({ type: li.dataset.type }));
       if (!nm || !steps.length) return;
-      if (r) {
-        await api(`/routines/${r.id}`, { method:"PATCH", body:{ name: nm, steps } });
-      } else {
-        await api("/routines", { method:"POST", body:{ name: nm, steps } });
-      }
-      dlg.close();
+      if (r) await api(`/routines/${r.id}`, { method:"PATCH", body:{ name:nm, steps } });
+      else await api("/routines", { method:"POST", body:{ name:nm, steps } });
+      editor.close();
       await loadData();
     };
   }
-
   function pushStep(type){
-    const q = queue();
-    if (!q) return;
+    if (!queue) return;
     const li = document.createElement("li");
     li.dataset.type = type;
     li.textContent = type;
     li.title = "Remove";
     li.onclick = ()=> li.remove();
-    q.appendChild(li);
+    queue.appendChild(li);
   }
 
-  function wireEditorPalette(){
-    const palette = $("#re-steps");
-    on(palette, "click", e=>{
-      const b = e.target.closest?.(".chip"); if(!b) return;
-      pushStep(b.dataset.type);
-    });
-    const btnNew = $("#btn-new-routine");
-    on(btnNew, "click", ()=> openEditor());
-  }
-
-  // ---------- runner ----------
-  const runner = () => $("#runner");
-
-  function startRun(r){
-    state.run.idx = 0;
-    state.run.steps = r.steps || [];
-    state.run.routineId = r.id;
-    state.run.routineName = r.name;
-    setText($("#run-title"), r.name);
-    renderRun();
-    runner()?.showModal();
-  }
-
-  function renderRun(){
-    const body = $("#run-body");
-    if (!body) return;
-    const step = state.run.steps[state.run.idx];
-    if (!step) { body.innerHTML = `<div class="muted">Done.</div>`; return; }
-    if (step.type === "box") body.innerHTML = boxBreathUI();
-    else if (step.type === "affirm") body.innerHTML = affirmUI();
-    else if (step.type === "white") body.innerHTML = whiteLightUI();
-    else body.innerHTML = `<div class="muted">Step</div>`;
-  }
-
-  on(window, "keydown", (e)=>{
-    if (e.key === "Escape") runner()?.close?.();
+  on($("#re-steps"), "click", e=>{
+    const b = e.target.closest?.(".chip"); if(!b) return;
+    pushStep(b.dataset.type);
   });
 
-  function wireRunner(){
-    const btnNext = $("#run-next");
-    on(btnNext, "click", async (e)=>{
-      e.preventDefault();
-      state.run.idx++;
-      if (state.run.idx >= state.run.steps.length){
-        await api(`/routines/${state.run.routineId}/complete`, { method:"POST" });
-        runner()?.close();
-        await loadData();
-      } else {
-        renderRun();
-      }
-    });
+  on($("#btn-new-routine"), "click", ()=> openEditor());
+  on($("#fab-new"), "click", ()=> openEditor());
+
+  // ---------- Runner ----------
+  const runner = $("#runner");
+
+  function startRun(r){
+    state.run = { idx:0, steps: r.steps || [], routineId: r.id, routineName: r.name };
+    set($("#run-title"), r.name);
+    renderRun();
+    runner?.showModal();
   }
+  function renderRun(){
+    const body = $("#run-body"); if (!body) return;
+    const s = state.run.steps[state.run.idx];
+    if (!s) { body.innerHTML = `<div class="muted">Done.</div>`; return; }
+    if (s.type === "box") body.innerHTML = boxBreathUI();
+    else if (s.type === "affirm") body.innerHTML = affirmUI();
+    else if (s.type === "white") body.innerHTML = whiteLightUI();
+    else body.innerHTML = `<div class="muted">Step</div>`;
+  }
+  on($("#run-next"), "click", async (e)=>{
+    e.preventDefault();
+    state.run.idx++;
+    if (state.run.idx >= state.run.steps.length){
+      await api(`/routines/${state.run.routineId}/complete`, { method:"POST" });
+      runner?.close();
+      await loadData();
+    } else {
+      renderRun();
+    }
+  });
+  on(window, "keydown", (e)=>{ if (e.key === "Escape") runner?.close?.(); });
 
   function boxBreathUI(){
     return `<div>
@@ -242,98 +219,68 @@
     </div>`;
   }
 
-  // ---------- auth wiring ----------
-  function wireAuth(){
-    const toSignup = $("#btn-to-signup");
-    const toLogin  = $("#btn-to-login");
-    const loginForm  = $("#login-form");
-    const signupForm = $("#signup-form");
-    const errBox   = $("#auth-error");
+  // ---------- Auth ----------
+  on($("#btn-to-signup"), "click", ()=>{
+    $("#login-form").hidden = true;
+    $("#signup-form").hidden = false;
+    $("#auth-error").hidden = true;
+  });
+  on($("#btn-to-login"), "click", ()=>{
+    $("#signup-form").hidden = true;
+    $("#login-form").hidden = false;
+    $("#auth-error").hidden = true;
+  });
 
-    on(toSignup, "click", ()=>{
-      if (loginForm) loginForm.hidden = true;
-      if (signupForm) signupForm.hidden = false;
-      if (errBox) errBox.hidden = true;
-    });
-
-    on(toLogin, "click", ()=>{
-      if (signupForm) signupForm.hidden = true;
-      if (loginForm) loginForm.hidden = false;
-      if (errBox) errBox.hidden = true;
-    });
-
-    on(loginForm, "submit", async (e)=>{
-      e.preventDefault();
-      try{
-        const username = $("#login-username")?.value.trim();
-        const passcode = $("#login-passcode")?.value.trim();
-        await api("/auth-login", { method:"POST", body:{ username, passcode } });
-        await loadData();
-      }catch(err){ showAuthError(err.message); }
-    });
-
-    on(signupForm, "submit", async (e)=>{
-      e.preventDefault();
-      try{
-        const username = $("#signup-username")?.value.trim();
-        const passcode = $("#signup-passcode")?.value.trim();
-        await api("/auth-signup", { method:"POST", body:{ username, passcode } });
-        await loadData();
-      }catch(err){ showAuthError(err.message); }
-    });
-
-    function showAuthError(msg){
-      const el = $("#auth-error");
-      if (!el) return;
-      el.textContent = msg || "Error";
-      el.hidden = false;
-    }
-
-    const btnLogout = $("#btn-logout");
-    on(btnLogout, "click", async ()=>{
-      await api("/auth-logout", { method:"POST" });
-      showAuth();
-    });
-
-    const shareBtn = $("#btn-share-profile");
-    on(shareBtn, "click", async ()=>{
-      try {
-        const { url } = await api("/share", { method:"POST" });
-        await navigator.clipboard?.writeText(url);
-        alert("Share URL copied.");
-      } catch (e) {
-        alert("Could not create share link.");
-      }
-    });
+  on($("#login-form"), "submit", async (e)=>{
+    e.preventDefault();
+    try{
+      const username = $("#login-username")?.value.trim();
+      const passcode = $("#login-passcode")?.value.trim();
+      await api("/auth-login", { method:"POST", body:{ username, passcode } });
+      await loadData();
+    }catch(err){ showAuthError(err.message); }
+  });
+  on($("#signup-form"), "submit", async (e)=>{
+    e.preventDefault();
+    try{
+      const username = $("#signup-username")?.value.trim();
+      const passcode = $("#signup-passcode")?.value.trim();
+      await api("/auth-signup", { method:"POST", body:{ username, passcode } });
+      await loadData();
+    }catch(err){ showAuthError(err.message); }
+  });
+  function showAuthError(msg){
+    const el = $("#auth-error");
+    if (!el) return;
+    el.textContent = msg || "Error";
+    el.hidden = false;
   }
 
-  // ---------- theme wiring ----------
-  function wireTheme(){
-    const toggle = $("#btn-theme");
-    on(toggle, "click", ()=>{
-      applyTheme(state.theme === "dark" ? "light" : state.theme === "light" ? "auto" : "dark");
-    });
-    $$('#tab-settings [data-theme]').forEach(b=>{
-      on(b, "click", ()=> applyTheme(b.dataset.theme));
-    });
-  }
+  on($("#btn-logout"), "click", async ()=>{
+    await api("/auth-logout", { method:"POST" });
+    showAuth();
+  });
+
+  on($("#btn-share-profile"), "click", async ()=>{
+    try{
+      const { url } = await api("/share", { method:"POST" });
+      await navigator.clipboard?.writeText(url);
+      alert("Share URL copied.");
+    }catch{ alert("Could not create share link."); }
+  });
+
+  // ---------- Theme ----------
+  on($("#btn-theme"), "click", ()=>{
+    applyTheme(state.theme === "dark" ? "light" : state.theme === "light" ? "auto" : "dark");
+  });
+  $$('.chip[data-theme]').forEach(b => on(b, "click", ()=> applyTheme(b.dataset.theme)));
 
   // ---------- boot ----------
-  async function boot() {
+  async function boot(){
     applyTheme();
-    wireTabs();
-    wireEditorPalette();
-    wireRunner();
-    wireAuth();
-    wireTheme();
-
     try { await loadData(); }
     catch { showAuth(); }
   }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", boot, { once: true });
-  } else {
-    boot();
-  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });
+  else boot();
 })();
