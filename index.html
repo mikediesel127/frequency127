@@ -6,7 +6,12 @@
   <title>Frequency127</title>
   <meta name="color-scheme" content="dark light"/>
   <link rel="stylesheet" href="/assets/styles.css"/>
-  <style>body{opacity:0;transition:opacity .15s ease}</style>
+
+  <!-- Prevent FOUC & enforce hidden -->
+  <style>
+    body{opacity:0;transition:opacity .15s ease}
+    [hidden]{display:none !important}
+  </style>
   <script>document.addEventListener('DOMContentLoaded',()=>{document.body.style.opacity=1})</script>
 </head>
 <body>
@@ -20,10 +25,11 @@
   <main class="shell">
     <!-- Auth -->
     <section id="auth-view" class="auth-wrap">
-      <div class="card auth">
+      <div class="card auth" id="auth-card">
         <h2 class="t-center">Welcome</h2>
         <p class="muted t-center">Minimal. Local-first feel. Fast.</p>
 
+        <!-- LOGIN -->
         <form id="login-form" class="stack gap-md" autocomplete="on">
           <label class="field">
             <input id="login-username" name="username" required minlength="3" maxlength="24"/>
@@ -39,6 +45,7 @@
           </div>
         </form>
 
+        <!-- SIGNUP (hidden by default) -->
         <form id="signup-form" class="stack gap-md" hidden autocomplete="on">
           <label class="field">
             <input id="signup-username" name="username" required minlength="3" maxlength="24"/>
