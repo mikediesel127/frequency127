@@ -6,6 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <meta name="color-scheme" content="dark light"/>
   <title>Frequency127</title>
+
+  <!-- prevent flash of unstyled content -->
+  <style>body{opacity:0;transition:opacity .2s ease}</style>
+  <script>window.addEventListener('load',()=>document.body.style.opacity=1)</script>
+
   <link rel="preload" href="/assets/styles.css" as="style"/>
   <link rel="stylesheet" href="/assets/styles.css"/>
 </head>
@@ -32,7 +37,7 @@
 
         <form id="login-form" class="stack gap-md" autocomplete="on">
           <label class="field">
-            <input id="login-username" name="username" required minlength="3" maxlength="24" pattern="[a-zA-Z0-9_\.~-]{3,24}" />
+            <input id="login-username" name="username" required minlength="3" maxlength="24" pattern="[a-zA-Z0-9_.~-]{3,24}" />
             <span>Username</span>
           </label>
           <label class="field">
@@ -47,7 +52,7 @@
 
         <form id="signup-form" class="stack gap-md" hidden autocomplete="on">
           <label class="field">
-            <input id="signup-username" name="username" required minlength="3" maxlength="24" pattern="[a-zA-Z0-9_\.~-]{3,24}" />
+            <input id="signup-username" name="username" required minlength="3" maxlength="24" pattern="[a-zA-Z0-9_.~-]{3,24}" />
             <span>Username</span>
           </label>
           <label class="field">
