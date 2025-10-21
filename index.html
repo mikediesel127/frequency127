@@ -9,77 +9,179 @@
 <body>
 <div id="auth">
 <div class="auth-card">
-<div class="logo"><div class="dot"></div><h1>Frequency127</h1></div>
-<p class="sub">Your daily OS</p>
+<div class="logo-hero">
+<div class="dot-pulse"></div>
+<h1>Frequency127</h1>
+</div>
+<p class="tagline">Your daily operating system</p>
 <form id="login-form" class="form">
-<input type="text" id="login-user" placeholder="Username" required>
-<input type="password" id="login-pass" placeholder="4-digit code" inputmode="numeric" maxlength="4" required>
+<div class="input-group">
+<input type="text" id="login-user" placeholder="Username" required autocomplete="username">
+</div>
+<div class="input-group">
+<input type="password" id="login-pass" placeholder="4-digit code" inputmode="numeric" maxlength="4" required autocomplete="current-password">
+</div>
 <button type="submit" class="btn-primary">Sign in</button>
 <button type="button" id="show-signup" class="btn-ghost">Create account</button>
 </form>
 <form id="signup-form" class="form" hidden>
-<input type="text" id="signup-user" placeholder="Username" required>
-<input type="password" id="signup-pass" placeholder="4-digit code" inputmode="numeric" maxlength="4" required>
+<div class="input-group">
+<input type="text" id="signup-user" placeholder="Username" required autocomplete="username">
+</div>
+<div class="input-group">
+<input type="password" id="signup-pass" placeholder="4-digit code" inputmode="numeric" maxlength="4" required autocomplete="new-password">
+</div>
 <button type="submit" class="btn-primary">Create</button>
 <button type="button" id="show-login" class="btn-ghost">Back</button>
 </form>
 <div id="auth-error" class="error" hidden></div>
 </div>
 </div>
+
 <div id="app" hidden>
 <header class="header">
-<div class="logo"><div class="dot"></div><span>Frequency127</span></div>
-<div class="user">
-<span id="username"></span>
-<span id="xp" class="xp">0 XP</span>
-<button id="logout" class="btn-ghost btn-sm">Logout</button>
+<div class="header-left">
+<div class="dot-pulse"></div>
+<span class="brand">Frequency127</span>
+</div>
+<div class="header-right">
+<div class="user-badge">
+<span id="username" class="username"></span>
+<div class="xp-badge">
+<span id="xp">0</span>
+<span class="xp-label">XP</span>
+</div>
+</div>
+<button id="logout" class="btn-icon-ghost">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M13 3l4 4-4 4M17 7H7M7 17H3V3h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+</button>
 </div>
 </header>
+
 <main class="main">
 <aside class="sidebar">
-<div class="card">
-<h3>Recent</h3>
+<div class="card glass">
+<h3 class="card-title">Community</h3>
 <div id="recent" class="chips"></div>
 </div>
 </aside>
+
 <section class="content">
 <div class="toolbar">
-<h2>Routines</h2>
-<button id="new-btn" class="btn-primary">+ New</button>
+<h2 class="page-title">Routines</h2>
+<button id="new-btn" class="btn-primary">
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+New Routine
+</button>
 </div>
-<div id="list" class="list"></div>
-<div id="empty" class="empty" hidden>
-<p>No routines yet</p>
-<button id="empty-btn" class="btn-primary">Create first</button>
+
+<div id="list" class="routine-grid"></div>
+<div id="empty" class="empty-state" hidden>
+<div class="empty-icon">✨</div>
+<h3>No routines yet</h3>
+<p>Create your first routine to start your journey</p>
+<button id="empty-btn" class="btn-primary">Create Routine</button>
 </div>
 </section>
 </main>
 </div>
-<dialog id="modal" class="modal">
-<div class="modal-content">
-<h3 id="modal-title">New routine</h3>
-<form id="routine-form">
-<input type="text" id="routine-name" placeholder="Routine name" required>
-<textarea id="routine-steps" placeholder="One step per line" rows="6"></textarea>
-<div class="actions">
-<button type="button" id="modal-cancel" class="btn-ghost">Cancel</button>
-<button type="submit" class="btn-primary">Save</button>
+
+<dialog id="builder-modal" class="modal">
+<div class="modal-content builder">
+<div class="modal-header">
+<h3 id="builder-title">New Routine</h3>
+<button type="button" id="builder-close" class="btn-icon-ghost">×</button>
 </div>
-</form>
+
+<div class="builder-body">
+<div class="input-group">
+<input type="text" id="routine-name" placeholder="Routine name" required>
+</div>
+
+<div class="steps-section">
+<h4>Steps</h4>
+<div id="steps-list" class="steps-list"></div>
+</div>
+
+<div class="step-types">
+<button type="button" class="step-type-btn" data-type="affirmation">
+<span class="step-icon">💭</span>
+<span>Affirmation</span>
+</button>
+<button type="button" class="step-type-btn" data-type="breathwork">
+<span class="step-icon">🌬️</span>
+<span>Breathwork</span>
+</button>
+<button type="button" class="step-type-btn" data-type="timer">
+<span class="step-icon">⏱️</span>
+<span>Timer</span>
+</button>
+<button type="button" class="step-type-btn" data-type="note">
+<span class="step-icon">📝</span>
+<span>Note</span>
+</button>
+</div>
+</div>
+
+<div class="modal-footer">
+<button type="button" id="builder-cancel" class="btn-ghost">Cancel</button>
+<button type="button" id="builder-save" class="btn-primary">Save Routine</button>
+</div>
 </div>
 </dialog>
-<template id="tpl">
-<div class="routine-card">
+
+<dialog id="runner-modal" class="modal runner-modal">
+<div class="runner-content">
+<button id="runner-close" class="runner-close">×</button>
+<div id="runner-step" class="runner-step"></div>
+<div class="runner-nav">
+<button id="runner-prev" class="btn-ghost">← Previous</button>
+<div class="runner-progress">
+<span id="runner-current">1</span> / <span id="runner-total">1</span>
+</div>
+<button id="runner-next" class="btn-primary">Next →</button>
+</div>
+</div>
+</dialog>
+
+<template id="step-item-tpl">
+<div class="step-item" draggable="true">
+<div class="step-drag">⋮⋮</div>
+<div class="step-content">
+<div class="step-header">
+<span class="step-icon"></span>
+<span class="step-type-label"></span>
+</div>
+<textarea class="step-input" placeholder="Enter content..." rows="2"></textarea>
+</div>
+<button class="step-remove" type="button">×</button>
+</div>
+</template>
+
+<template id="routine-card-tpl">
+<div class="routine-card glass">
 <div class="routine-header">
 <h4 class="routine-name"></h4>
 <div class="routine-actions">
-<button class="btn-icon btn-complete" title="Complete">✓</button>
-<button class="btn-icon btn-delete" title="Delete">×</button>
+<button class="btn-icon run-btn" title="Run">
+<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2l10 6-10 6V2z"/></svg>
+</button>
+<button class="btn-icon edit-btn" title="Edit">
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M11.5 2.5l2 2L6 12H4v-2l7.5-7.5z" stroke="currentColor" stroke-width="1.5"/></svg>
+</button>
+<button class="btn-icon del-btn" title="Delete">
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 4h10M6 4V3h4v1M5 4v9h6V4" stroke="currentColor" stroke-width="1.5"/></svg>
+</button>
 </div>
 </div>
-<div class="routine-steps"></div>
+<div class="routine-meta">
+<span class="step-count"></span>
+<span class="completion-badge" hidden>✓ Completed</span>
+</div>
+<div class="routine-steps-preview"></div>
 </div>
 </template>
+
 <script src="/assets/app.js"></script>
 </body>
 </html>

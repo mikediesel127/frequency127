@@ -116,6 +116,11 @@ function now() {
   return Math.floor(Date.now() / 1000);
 }
 
+function dayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 async function readJSON(req) {
   try {
     return await req.json();
@@ -183,6 +188,13 @@ async function me(req, env) {
     "SELECT id, name, steps, created_at FROM routines WHERE user_id = ? ORDER BY created_at DESC"
   ).bind(user.id).all();
   
+  const today = dayKey();
+  const completions = await env.DB.prepare(
+    "SELECT routine_id FROM routine_completions WHERE user_id = ? AND day_key = ?"
+  ).bind(user.id, today).all();
+  
+  const completedIds = new Set(completions.results.map(c => c.routine_id));
+  
   return json({
     id: user.id,
     username: user.username,
@@ -192,7 +204,8 @@ async function me(req, env) {
       id: r.id,
       name: r.name,
       steps: parseSteps(r.steps),
-      created_at: r.created_at
+      created_at: r.created_at,
+      completed_today: completedIds.has(r.id)
     }))
   });
 }
@@ -210,12 +223,20 @@ async function listRoutines(req, env) {
     "SELECT id, name, steps, created_at FROM routines WHERE user_id = ? ORDER BY created_at DESC"
   ).bind(user.id).all();
   
+  const today = dayKey();
+  const completions = await env.DB.prepare(
+    "SELECT routine_id FROM routine_completions WHERE user_id = ? AND day_key = ?"
+  ).bind(user.id, today).all();
+  
+  const completedIds = new Set(completions.results.map(c => c.routine_id));
+  
   return json({
     routines: res.results.map(r => ({
       id: r.id,
       name: r.name,
       steps: parseSteps(r.steps),
-      created_at: r.created_at
+      created_at: r.created_at,
+      completed_today: completedIds.has(r.id)
     }))
   });
 }
@@ -244,7 +265,19 @@ async function getRoutine(req, env, id) {
   ).bind(id, user.id).first();
   
   if (!r) return json({ error: "Not found" }, 404);
-  return json({ id: r.id, name: r.name, steps: parseSteps(r.steps), created_at: r.created_at });
+  
+  const today = dayKey();
+  const completion = await env.DB.prepare(
+    "SELECT 1 FROM routine_completions WHERE routine_id = ? AND user_id = ? AND day_key = ?"
+  ).bind(id, user.id, today).first();
+  
+  return json({ 
+    id: r.id, 
+    name: r.name, 
+    steps: parseSteps(r.steps), 
+    created_at: r.created_at,
+    completed_today: !!completion
+  });
 }
 
 async function updateRoutine(req, env, id) {
@@ -282,10 +315,17 @@ async function complete(req, env, id) {
   const r = await env.DB.prepare("SELECT id FROM routines WHERE id = ? AND user_id = ?").bind(id, user.id).first();
   if (!r) return json({ error: "Not found" }, 404);
   
-  const xp = 10;
+  const today = dayKey();
+  const exists = await env.DB.prepare(
+    "SELECT 1 FROM routine_completions WHERE routine_id = ? AND user_id = ? AND day_key = ?"
+  ).bind(id, user.id, today).first();
+  
+  if (exists) return json({ ok: true, xp_awarded: 0, already_completed: true });
+  
+  const xp = 25;
   await env.DB.prepare(
-    "INSERT INTO routine_completions (id, routine_id, user_id, created_at, xp_awarded) VALUES (?, ?, ?, ?, ?)"
-  ).bind(uid(), id, user.id, now(), xp).run();
+    "INSERT INTO routine_completions (id, routine_id, user_id, day_key, created_at, xp_awarded) VALUES (?, ?, ?, ?, ?, ?)"
+  ).bind(uid(), id, user.id, today, now(), xp).run();
   
   await env.DB.prepare("UPDATE users SET xp = xp + ? WHERE id = ?").bind(xp, user.id).run();
   

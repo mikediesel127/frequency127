@@ -21,11 +21,13 @@ CREATE TABLE IF NOT EXISTS routine_completions (
   id TEXT PRIMARY KEY,
   routine_id TEXT NOT NULL,
   user_id TEXT NOT NULL,
+  day_key TEXT NOT NULL,
   created_at INTEGER NOT NULL,
   xp_awarded INTEGER NOT NULL,
+  UNIQUE(routine_id, user_id, day_key),
   FOREIGN KEY(routine_id) REFERENCES routines(id) ON DELETE CASCADE,
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_routines_user ON routines(user_id);
-CREATE INDEX IF NOT EXISTS idx_completions_user ON routine_completions(user_id);
+CREATE INDEX IF NOT EXISTS idx_completions_user_day ON routine_completions(user_id, day_key);
