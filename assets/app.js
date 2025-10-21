@@ -26,10 +26,12 @@ let user = null;
 async function api(path, opts = {}) {
   const res = await fetch(`/api${path}`, {
     ...opts,
+    credentials: 'include',
     headers: { 'content-type': 'application/json', ...opts.headers }
   });
   const data = await res.json().catch(() => ({}));
-  return { ok: res.ok, data };
+  console.log('API Response:', path, res.status, data);
+  return { ok: res.ok, status: res.status, data };
 }
 
 function showAuth() {
@@ -55,7 +57,7 @@ async function loadMe() {
   user = data;
   username.textContent = data.username;
   xp.textContent = `${data.xp} XP`;
-  renderRoutines(data.routines);
+  renderRoutines(data.routines || []);
   showApp();
   loadRecent();
 }
@@ -145,31 +147,54 @@ showLogin.onclick = () => {
 
 loginForm.onsubmit = async e => {
   e.preventDefault();
+  console.log('Login form submitted');
   const username = $('#login-user').value.trim();
   const passcode = $('#login-pass').value.trim();
   
-  const { ok, data } = await api('/auth/login', {
+  console.log('Login attempt:', { username, passcode: '****' });
+  
+  const { ok, status, data } = await api('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ username, passcode })
   });
   
-  if (!ok) return showError(data.error || 'Login failed');
+  console.log('Login result:', { ok, status, data });
+  
+  if (!ok) {
+    showError(data.error || 'Login failed');
+    return;
+  }
+  
+  console.log('Login success, loading user data...');
   await loadMe();
 };
 
 signupForm.onsubmit = async e => {
   e.preventDefault();
+  console.log('Signup form submitted');
   const username = $('#signup-user').value.trim();
   const passcode = $('#signup-pass').value.trim();
   
-  if (!/^\d{4}$/.test(passcode)) return showError('Code must be 4 digits');
+  console.log('Signup attempt:', { username, passcode: '****' });
   
-  const { ok, data } = await api('/auth/signup', {
+  if (!/^\d{4}$/.test(passcode)) {
+    showError('Code must be 4 digits');
+    return;
+  }
+  
+  const { ok, status, data } = await api('/auth/signup', {
     method: 'POST',
     body: JSON.stringify({ username, passcode })
   });
   
-  if (!ok) return showError(data.error || 'Signup failed');
+  console.log('Signup result:', { ok, status, data });
+  
+  if (!ok) {
+    showError(data.error || 'Signup failed');
+    return;
+  }
+  
+  console.log('Signup success, loading user data...');
   await loadMe();
 };
 
@@ -199,5 +224,6 @@ routineForm.onsubmit = async e => {
   }
 };
 
+console.log('App initializing...');
 loadMe();
 })();
