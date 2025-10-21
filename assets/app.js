@@ -23,8 +23,8 @@ const builderTitle = $('#builder-title');
 const builderClose = $('#builder-close');
 const builderCancel = $('#builder-cancel');
 const builderSave = $('#builder-save');
-const routineName = $('#routine-name');
-const stepsList = $('#steps-list');
+const builderRoutineName = $('#builder-routine-name');
+const builderStepsList = $('#builder-steps-list');
 
 const runnerModal = $('#runner-modal');
 const runnerClose = $('#runner-close');
@@ -146,14 +146,14 @@ function renderRoutines(routines) {
 function openBuilder(routine = null) {
   currentRoutineId = routine ? routine.id : null;
   builderTitle.textContent = routine ? 'Edit Routine' : 'New Routine';
-  routineName.value = routine ? routine.name : '';
+  builderRoutineName.value = routine ? routine.name : '';
   builderSteps = routine ? [...routine.steps] : [];
   renderBuilderSteps();
   builderModal.showModal();
 }
 
 function renderBuilderSteps() {
-  stepsList.innerHTML = '';
+  builderStepsList.innerHTML = '';
   builderSteps.forEach((step, index) => {
     const clone = stepItemTpl.content.cloneNode(true);
     const item = clone.querySelector('.step-item');
@@ -199,7 +199,7 @@ function renderBuilderSteps() {
       }
     };
     
-    stepsList.appendChild(clone);
+    builderStepsList.appendChild(clone);
   });
 }
 
@@ -209,7 +209,7 @@ function addStep(type) {
 }
 
 async function saveRoutine() {
-  const name = routineName.value.trim();
+  const name = builderRoutineName.value.trim();
   if (!name) {
     alert('Please enter a routine name');
     return;
@@ -272,6 +272,7 @@ function showRunnerStep(index) {
   const step = runnerState.routine.steps[index];
   runnerState.currentIndex = index;
   runnerCurrent.textContent = index + 1;
+  
   runnerPrev.disabled = index === 0;
   runnerNext.textContent = index === runnerState.routine.steps.length - 1 ? 'Complete' : 'Next →';
   
@@ -437,12 +438,12 @@ showLogin.onclick = () => {
 
 loginForm.onsubmit = async e => {
   e.preventDefault();
-  const username = $('#login-user').value.trim();
+  const usernameVal = $('#login-user').value.trim();
   const passcode = $('#login-pass').value.trim();
   
   const { ok, data } = await api('/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ username, passcode })
+    body: JSON.stringify({ username: usernameVal, passcode })
   });
   
   if (!ok) return showError(data.error || 'Login failed');
@@ -451,14 +452,14 @@ loginForm.onsubmit = async e => {
 
 signupForm.onsubmit = async e => {
   e.preventDefault();
-  const username = $('#signup-user').value.trim();
+  const usernameVal = $('#signup-user').value.trim();
   const passcode = $('#signup-pass').value.trim();
   
   if (!/^\d{4}$/.test(passcode)) return showError('Code must be 4 digits');
   
   const { ok, data } = await api('/auth/signup', {
     method: 'POST',
-    body: JSON.stringify({ username, passcode })
+    body: JSON.stringify({ username: usernameVal, passcode })
   });
   
   if (!ok) return showError(data.error || 'Signup failed');
@@ -477,8 +478,11 @@ builderClose.onclick = () => builderModal.close();
 builderCancel.onclick = () => builderModal.close();
 builderSave.onclick = saveRoutine;
 
-$$('.step-type-btn').forEach(btn => {
-  btn.onclick = () => addStep(btn.dataset.type);
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('step-type-btn') || e.target.closest('.step-type-btn')) {
+    const btn = e.target.classList.contains('step-type-btn') ? e.target : e.target.closest('.step-type-btn');
+    addStep(btn.dataset.type);
+  }
 });
 
 runnerClose.onclick = () => {
@@ -491,12 +495,12 @@ runnerClose.onclick = () => {
 runnerPrev.onclick = prevStep;
 runnerNext.onclick = nextStep;
 
-runnerModal.onclose = () => {
+runnerModal.addEventListener('close', () => {
   if (runnerState.intervalId) {
     clearInterval(runnerState.intervalId);
     runnerState.intervalId = null;
   }
-};
+});
 
 loadMe();
 })();
