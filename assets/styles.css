@@ -729,6 +729,13 @@ input, textarea {
   background: rgba(13, 17, 23, 0.8);
 }
 
+.step-input.timer-input {
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+  padding: 12px;
+}
+
 .step-remove {
   width: 28px;
   height: 28px;
@@ -837,36 +844,47 @@ input, textarea {
   display: grid;
   place-items: center;
   width: 100%;
-  max-width: 900px;
+  max-width: 1000px;
   text-align: center;
   padding: 40px;
 }
 
 .runner-affirmation {
-  font-size: 48px;
+  font-size: 52px;
   font-weight: 700;
   line-height: 1.4;
   letter-spacing: -1px;
+  color: var(--text);
+  position: relative;
+  padding: 20px;
 }
 
-.runner-affirmation .word {
-  display: inline-block;
-  margin: 0 8px;
-  transition: var(--transition);
-  opacity: 0.3;
+.runner-affirmation-base {
+  color: rgba(230, 237, 243, 0.3);
 }
 
-.runner-affirmation .word.active {
-  opacity: 1;
-  color: var(--primary);
-  text-shadow: 0 0 40px var(--primary-glow);
-  transform: scale(1.1);
+.runner-affirmation-overlay {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  right: 20px;
+  background: linear-gradient(90deg, var(--primary) 0%, var(--success) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 0.1s linear;
 }
 
 .runner-breathwork {
   font-size: 32px;
   font-weight: 600;
+  color: var(--text);
+}
+
+.runner-breathwork p {
   color: var(--text-muted);
+  margin-top: 20px;
 }
 
 .runner-breathwork .breath-circle {
@@ -884,17 +902,35 @@ input, textarea {
 }
 
 .runner-timer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+}
+
+.runner-timer-display {
   font-size: 96px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   letter-spacing: -2px;
+  color: var(--text);
+}
+
+.runner-timer-label {
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-align: center;
+  max-width: 700px;
+  line-height: 1.6;
 }
 
 .runner-note {
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 500;
-  line-height: 1.6;
-  color: var(--text-muted);
+  line-height: 1.7;
+  color: var(--text);
+  max-width: 900px;
 }
 
 .runner-nav {
@@ -946,7 +982,15 @@ input, textarea {
   }
   
   .runner-affirmation {
-    font-size: 32px;
+    font-size: 36px;
+  }
+  
+  .runner-note {
+    font-size: 24px;
+  }
+  
+  .runner-timer-display {
+    font-size: 72px;
   }
   
   .runner-content {

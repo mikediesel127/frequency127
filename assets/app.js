@@ -161,10 +161,21 @@ function renderBuilderSteps() {
     item.dataset.index = index;
     item.querySelector('.step-icon').textContent = STEP_ICONS[step.type];
     item.querySelector('.step-type-label').textContent = STEP_LABELS[step.type];
-    item.querySelector('.step-input').value = step.content || '';
-    item.querySelector('.step-input').placeholder = `Enter ${STEP_LABELS[step.type].toLowerCase()} content...`;
     
-    item.querySelector('.step-input').oninput = (e) => {
+    const input = item.querySelector('.step-input');
+    input.value = step.content || '';
+    
+    if (step.type === 'timer') {
+      input.placeholder = 'Seconds (e.g., 60)';
+      input.type = 'number';
+      input.min = '1';
+      input.classList.add('timer-input');
+    } else {
+      input.placeholder = `Enter ${STEP_LABELS[step.type].toLowerCase()} content...`;
+      input.type = 'text';
+    }
+    
+    input.oninput = (e) => {
       builderSteps[index].content = e.target.value;
     };
     
@@ -300,35 +311,37 @@ function showRunnerStep(index) {
 }
 
 function renderAffirmation(content) {
-  const words = content.split(' ').filter(Boolean);
   const container = document.createElement('div');
   container.className = 'runner-affirmation';
   
-  words.forEach(word => {
-    const span = document.createElement('span');
-    span.className = 'word';
-    span.textContent = word;
-    container.appendChild(span);
-  });
+  const baseText = document.createElement('div');
+  baseText.className = 'runner-affirmation-base';
+  baseText.textContent = content;
   
+  const overlayText = document.createElement('div');
+  overlayText.className = 'runner-affirmation-overlay';
+  overlayText.textContent = content;
+  
+  container.appendChild(baseText);
+  container.appendChild(overlayText);
   runnerStep.appendChild(container);
   
-  let currentWordIndex = 0;
-  const wordElements = container.querySelectorAll('.word');
+  const duration = Math.max(content.length * 80, 3000);
+  let progress = 0;
   
-  function highlightWord() {
-    wordElements.forEach((w, i) => {
-      w.classList.toggle('active', i === currentWordIndex);
-    });
-    currentWordIndex++;
-    if (currentWordIndex >= wordElements.length) {
-      clearInterval(runnerState.intervalId);
+  function animate() {
+    progress += 10;
+    const percentage = Math.min((progress / duration) * 100, 100);
+    overlayText.style.clipPath = `inset(0 ${100 - percentage}% 0 0)`;
+    
+    if (progress < duration) {
+      runnerState.intervalId = setTimeout(animate, 10);
+    } else {
       runnerState.intervalId = null;
     }
   }
   
-  highlightWord();
-  runnerState.intervalId = setInterval(highlightWord, 400);
+  animate();
 }
 
 function renderBreathwork(content) {
@@ -342,20 +355,34 @@ function renderBreathwork(content) {
 }
 
 function renderTimer(content) {
-  const seconds = parseInt(content) || 60;
+  const parts = content.split('|');
+  const seconds = parseInt(parts[0]) || 60;
+  const label = parts[1] || '';
+  
   const container = document.createElement('div');
   container.className = 'runner-timer';
-  container.textContent = formatTime(seconds);
+  
+  const timerDisplay = document.createElement('div');
+  timerDisplay.className = 'runner-timer-display';
+  timerDisplay.textContent = formatTime(seconds);
+  
+  const timerLabel = document.createElement('div');
+  timerLabel.className = 'runner-timer-label';
+  timerLabel.textContent = label;
+  
+  container.appendChild(timerDisplay);
+  if (label) container.appendChild(timerLabel);
   runnerStep.appendChild(container);
   
   let remaining = seconds;
   runnerState.intervalId = setInterval(() => {
     remaining--;
-    container.textContent = formatTime(remaining);
+    timerDisplay.textContent = formatTime(remaining);
     if (remaining <= 0) {
       clearInterval(runnerState.intervalId);
       runnerState.intervalId = null;
-      container.textContent = '✓';
+      timerDisplay.textContent = '✓';
+      timerDisplay.style.color = 'var(--success)';
     }
   }, 1000);
 }
@@ -400,7 +427,7 @@ async function completeRoutine() {
     runnerStep.innerHTML = `
       <div style="text-align: center;">
         <div style="font-size: 80px; margin-bottom: 20px;">🎉</div>
-        <h2 style="font-size: 36px; font-weight: 800; margin-bottom: 16px;">Routine Complete!</h2>
+        <h2 style="font-size: 36px; font-weight: 800; margin-bottom: 16px; color: var(--text);">Routine Complete!</h2>
         <p style="font-size: 20px; color: var(--text-muted); margin-bottom: 24px;">+${data.xp_awarded} XP earned</p>
       </div>
     `;
@@ -413,7 +440,7 @@ async function completeRoutine() {
     runnerStep.innerHTML = `
       <div style="text-align: center;">
         <div style="font-size: 80px; margin-bottom: 20px;">✓</div>
-        <h2 style="font-size: 36px; font-weight: 800; margin-bottom: 16px;">Already Completed</h2>
+        <h2 style="font-size: 36px; font-weight: 800; margin-bottom: 16px; color: var(--text);">Already Completed</h2>
         <p style="font-size: 20px; color: var(--text-muted);">You've already completed this routine today</p>
       </div>
     `;
