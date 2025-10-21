@@ -1,139 +1,85 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Frequency127</title>
-  <meta name="color-scheme" content="dark light"/>
-  <link rel="stylesheet" href="/assets/styles.css"/>
-
-  <!-- Prevent FOUC & enforce hidden -->
-  <style>
-    body{opacity:0;transition:opacity .15s ease}
-    [hidden]{display:none !important}
-  </style>
-  <script>document.addEventListener('DOMContentLoaded',()=>{document.body.style.opacity=1})</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Frequency127</title>
+<link rel="stylesheet" href="/assets/styles.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand"><span class="dot"></span><span class="word">Frequency127</span></div>
-    <div class="actions">
-      <button id="btn-logout" class="ghost" hidden>Logout</button>
-    </div>
-  </header>
-
-  <main class="shell">
-    <!-- Auth -->
-    <section id="auth-view" class="auth-wrap">
-      <div class="card auth" id="auth-card">
-        <h2 class="t-center">Welcome</h2>
-        <p class="muted t-center">Minimal. Local-first feel. Fast.</p>
-
-        <!-- LOGIN -->
-        <form id="login-form" class="stack gap-md" autocomplete="on">
-          <label class="field">
-            <input id="login-username" name="username" required minlength="3" maxlength="24"/>
-            <span>Username</span>
-          </label>
-          <label class="field">
-            <input id="login-passcode" name="passcode" inputmode="numeric" required minlength="4" maxlength="4"/>
-            <span>4-digit passcode</span>
-          </label>
-          <div class="row">
-            <button class="primary grow" id="btn-login" type="submit">Sign in</button>
-            <button class="ghost" id="btn-to-signup" type="button">Create</button>
-          </div>
-        </form>
-
-        <!-- SIGNUP (hidden by default) -->
-        <form id="signup-form" class="stack gap-md" hidden autocomplete="on">
-          <label class="field">
-            <input id="signup-username" name="username" required minlength="3" maxlength="24"/>
-            <span>Username</span>
-          </label>
-          <label class="field">
-            <input id="signup-passcode" name="passcode" inputmode="numeric" required minlength="4" maxlength="4"/>
-            <span>4-digit passcode</span>
-          </label>
-          <div class="row">
-            <button class="primary grow" id="btn-signup" type="submit">Create</button>
-            <button class="ghost" id="btn-to-login" type="button">Back</button>
-          </div>
-        </form>
-
-        <p id="auth-error" class="error t-center" role="alert" hidden></p>
-      </div>
-    </section>
-
-    <!-- App -->
-    <section id="app-view" class="grid two" hidden>
-      <aside class="panel">
-        <div class="card profile">
-          <div class="row">
-            <div class="avatar-dot"></div>
-            <div>
-              <div id="me-username" class="username mono"></div>
-              <div class="muted tiny">XP <span id="me-xp">0</span></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <h3>Recently active</h3>
-          <div id="recent-users" class="chips"></div>
-        </div>
-      </aside>
-
-      <section class="panel">
-        <div class="row space-between headrow">
-          <h2>Routines</h2>
-          <button id="btn-new" class="primary pill">New</button>
-        </div>
-        <ul id="routine-list" class="list"></ul>
-        <p id="empty-state" class="muted t-center" hidden>No routines yet. Tap “New”.</p>
-      </section>
-    </section>
-  </main>
-
-  <!-- Simple modal -->
-  <dialog id="routine-modal" class="modal">
-    <form method="dialog" class="card modal-card">
-      <header class="row space-between">
-        <h3 id="rm-title">New routine</h3>
-        <button class="icon ghost" value="close" aria-label="Close">✕</button>
-      </header>
-
-      <div class="stack gap-md">
-        <label class="field">
-          <input id="rm-name" required maxlength="48"/>
-          <span>Name</span>
-        </label>
-        <label class="field">
-          <textarea id="rm-steps" rows="4" placeholder='One step per line (e.g. "Box breathe 4-4-4-4")'></textarea>
-          <span>Steps</span>
-        </label>
-      </div>
-
-      <footer class="row space-between">
-        <button class="ghost" value="close">Cancel</button>
-        <button class="primary" id="rm-save" value="save">Save</button>
-      </footer>
-    </form>
-  </dialog>
-
-  <template id="tpl-item">
-    <li class="item card">
-      <div class="row space-between">
-        <div class="title"></div>
-        <div class="row">
-          <button class="icon pill run" title="Run">▶</button>
-          <button class="icon ghost del" title="Delete">🗑</button>
-        </div>
-      </div>
-      <div class="meta muted tiny steps"></div>
-    </li>
-  </template>
-
-  <script defer src="/assets/app.js"></script>
+<div id="auth" class="auth">
+<div class="card auth-card">
+<div class="logo"><div class="dot"></div><h1>Frequency127</h1></div>
+<p class="sub">Your daily OS</p>
+<form id="login-form" class="form">
+<input type="text" id="login-user" placeholder="Username" required>
+<input type="password" id="login-pass" placeholder="4-digit code" inputmode="numeric" maxlength="4" required>
+<button type="submit" class="btn-primary">Sign in</button>
+<button type="button" id="show-signup" class="btn-ghost">Create account</button>
+</form>
+<form id="signup-form" class="form" hidden>
+<input type="text" id="signup-user" placeholder="Username" required>
+<input type="password" id="signup-pass" placeholder="4-digit code" inputmode="numeric" maxlength="4" required>
+<button type="submit" class="btn-primary">Create</button>
+<button type="button" id="show-login" class="btn-ghost">Back</button>
+</form>
+<div id="auth-error" class="error" hidden></div>
+</div>
+</div>
+<div id="app" class="app" hidden>
+<header class="header">
+<div class="logo"><div class="dot"></div><span>Frequency127</span></div>
+<div class="user">
+<span id="username"></span>
+<span id="xp" class="xp">0 XP</span>
+<button id="logout" class="btn-ghost btn-sm">Logout</button>
+</div>
+</header>
+<main class="main">
+<aside class="sidebar">
+<div class="card">
+<h3>Recent</h3>
+<div id="recent" class="chips"></div>
+</div>
+</aside>
+<section class="content">
+<div class="toolbar">
+<h2>Routines</h2>
+<button id="new-btn" class="btn-primary">+ New</button>
+</div>
+<div id="list" class="list"></div>
+<div id="empty" class="empty" hidden>
+<p>No routines yet</p>
+<button id="empty-btn" class="btn-primary">Create first</button>
+</div>
+</section>
+</main>
+</div>
+<dialog id="modal" class="modal">
+<div class="modal-content">
+<h3 id="modal-title">New routine</h3>
+<form id="routine-form">
+<input type="text" id="routine-name" placeholder="Routine name" required>
+<textarea id="routine-steps" placeholder="One step per line" rows="6"></textarea>
+<div class="actions">
+<button type="button" id="modal-cancel" class="btn-ghost">Cancel</button>
+<button type="submit" class="btn-primary">Save</button>
+</div>
+</form>
+</div>
+</dialog>
+<template id="tpl">
+<div class="routine-card">
+<div class="routine-header">
+<h4 class="routine-name"></h4>
+<div class="routine-actions">
+<button class="btn-icon btn-complete" title="Complete">✓</button>
+<button class="btn-icon btn-delete" title="Delete">×</button>
+</div>
+</div>
+<div class="routine-steps"></div>
+</div>
+</template>
+<script src="/assets/app.js"></script>
 </body>
 </html>

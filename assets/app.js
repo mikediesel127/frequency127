@@ -1,195 +1,203 @@
-(() => {
-  // ------- tiny helpers -------
-  const $ = (sel, p = document) => p.querySelector(sel);
-  const j = (u, o={}) => fetch(u, { headers: { 'content-type': 'application/json' }, credentials:'include', ...o });
-  const pj = r => r.json().catch(()=> ({}));
+(function() {
+const $ = s => document.querySelector(s);
 
-  // ------- nodes -------
-  const authView   = $('#auth-view');
-  const authCard   = $('#auth-card');
-  const appView    = $('#app-view');
-  const logoutBtn  = $('#btn-logout');
-  const authErr    = $('#auth-error');
+const auth = $('#auth');
+const app = $('#app');
+const loginForm = $('#login-form');
+const signupForm = $('#signup-form');
+const authError = $('#auth-error');
+const showSignup = $('#show-signup');
+const showLogin = $('#show-login');
+const logout = $('#logout');
+const username = $('#username');
+const xp = $('#xp');
+const recent = $('#recent');
+const list = $('#list');
+const empty = $('#empty');
+const newBtn = $('#new-btn');
+const emptyBtn = $('#empty-btn');
+const modal = $('#modal');
+const routineForm = $('#routine-form');
+const modalCancel = $('#modal-cancel');
+const tpl = $('#tpl');
 
-  const loginForm  = $('#login-form');
-  const signupForm = $('#signup-form');
-  const toSignup   = $('#btn-to-signup');
-  const toLogin    = $('#btn-to-login');
+let user = null;
 
-  const meUsername = $('#me-username');
-  const meXP       = $('#me-xp');
-  const recentWrap = $('#recent-users');
-
-  const list       = $('#routine-list');
-  const emptyState = $('#empty-state');
-  const newBtn     = $('#btn-new');
-
-  const modal      = $('#routine-modal');
-  const rmName     = $('#rm-name');
-  const rmSteps    = $('#rm-steps');
-  const tplItem    = $('#tpl-item');
-
-  // ------- view toggles (hard) -------
-  function showAuth() {
-    authView.hidden = false;
-    appView.hidden  = true;
-    logoutBtn.hidden = true;
-  }
-  function showApp() {
-    authView.hidden = true;
-    appView.hidden  = false;
-    logoutBtn.hidden = false;
-  }
-  function destroyAuth() {
-    // permanently remove to avoid any overlay/stacking weirdness
-    authView.remove();
-    logoutBtn.hidden = false;
-  }
-
-  // ------- utils -------
-  function stepsToArray(text) {
-    return String(text||'')
-      .split('\n')
-      .map(s => s.trim())
-      .filter(Boolean)
-      .map(s => ({ type:'note', text:s }));
-  }
-  const stepsSummary = (steps=[]) =>
-    steps.length ? steps.map(s => s.text||s.type).slice(0,3).join(' • ') + (steps.length>3?' …':'') : 'No steps yet';
-
-  // ------- state -------
-  let ME = null;
-
-  async function loadMe() {
-    const r = await j('/me');
-    if (r.status === 401) { showAuth(); return; }
-    if (!r.ok) { console.error('ME failed', r.status); showAuth(); return; }
-    const me = await pj(r);
-    ME = me;
-    meUsername.textContent = me.username || '';
-    meXP.textContent = me.xp ?? 0;
-    renderRoutines(me.routines || []);
-    showApp();
-    // auth is no longer needed once user is in
-    destroyAuth();
-    loadRecent().catch(()=>{});
-  }
-
-  async function loadRecent() {
-    const r = await fetch('/users-recent');
-    const data = await pj(r);
-    recentWrap.innerHTML = '';
-    (data.users || []).forEach(u => {
-      const b = document.createElement('button');
-      b.className = 'chip';
-      b.textContent = u;
-      recentWrap.appendChild(b);
-    });
-  }
-
-  function renderRoutines(items) {
-    list.innerHTML = '';
-    if (!items.length) { emptyState.hidden = false; return; }
-    emptyState.hidden = true;
-
-    for (const it of items) {
-      const node = tplItem.content.firstElementChild.cloneNode(true);
-      node.querySelector('.title').textContent = it.name;
-      node.querySelector('.steps').textContent = stepsSummary(it.steps);
-
-      node.querySelector('.run').addEventListener('click', async () => {
-        const r = await j(`/routines/${encodeURIComponent(it.id)}/complete`, { method:'POST' });
-        if (r.ok) {
-          const data = await pj(r);
-          const add = Number(data.xp_awarded || 0);
-          meXP.textContent = Number(meXP.textContent||0) + add;
-        }
-      });
-
-      node.querySelector('.del').addEventListener('click', async () => {
-        if (!confirm('Delete this routine?')) return;
-        const r = await j(`/routines/${encodeURIComponent(it.id)}`, { method:'DELETE' });
-        if (r.ok) {
-          node.remove();
-          if (!list.children.length) emptyState.hidden = false;
-        }
-      });
-
-      list.appendChild(node);
-    }
-  }
-
-  // ------- events -------
-  document.addEventListener('DOMContentLoaded', () => {
-    // Ensure signup is hidden on first paint (belt & braces)
-    signupForm.hidden = true;
-
-    toSignup.addEventListener('click', () => {
-      signupForm.hidden = false;
-      loginForm.hidden  = true;
-      authErr.hidden = true;
-    });
-    toLogin.addEventListener('click', () => {
-      signupForm.hidden = true;
-      loginForm.hidden  = false;
-      authErr.hidden = true;
-    });
-
-    loginForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      authErr.hidden = true;
-      const username = $('#login-username').value.trim();
-      const passcode = $('#login-passcode').value.trim();
-      const r = await j('/auth-login', { method:'POST', body: JSON.stringify({ username, passcode }) });
-      const data = await pj(r);
-      if (!r.ok) {
-        authErr.textContent = data.error || 'Login failed';
-        authErr.hidden = false;
-        return;
-      }
-      await loadMe();
-    });
-
-    signupForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      authErr.hidden = true;
-      const username = $('#signup-username').value.trim();
-      const passcode = $('#signup-passcode').value.trim();
-      const r = await j('/auth-signup', { method:'POST', body: JSON.stringify({ username, passcode }) });
-      const data = await pj(r);
-      if (!r.ok) {
-        authErr.textContent = data.error || 'Signup failed';
-        authErr.hidden = false;
-        return;
-      }
-      await loadMe();
-    });
-
-    logoutBtn.addEventListener('click', async () => {
-      await j('/auth-logout', { method:'POST' });
-      // Refresh to fully reset app state
-      location.reload();
-    });
-
-    newBtn?.addEventListener('click', () => {
-      $('#routine-modal').showModal();
-      rmName.value = '';
-      rmSteps.value = '';
-    });
-
-    $('#rm-save')?.addEventListener('click', async (e) => {
-      e.preventDefault();
-      const name  = rmName.value.trim();
-      const steps = stepsToArray(rmSteps.value);
-      if (!name) return;
-      const r = await j('/routines', { method:'POST', body: JSON.stringify({ name, steps }) });
-      if (r.ok) {
-        $('#routine-modal').close();
-        await loadMe();
-      }
-    });
-
-    // Boot
-    loadMe();
+async function api(path, opts = {}) {
+  const res = await fetch(`/api${path}`, {
+    ...opts,
+    headers: { 'content-type': 'application/json', ...opts.headers }
   });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, data };
+}
+
+function showAuth() {
+  auth.hidden = false;
+  app.hidden = true;
+}
+
+function showApp() {
+  auth.hidden = true;
+  app.hidden = false;
+}
+
+function showError(msg) {
+  authError.textContent = msg;
+  authError.hidden = false;
+  setTimeout(() => authError.hidden = true, 4000);
+}
+
+async function loadMe() {
+  const { ok, data } = await api('/auth/me');
+  if (!ok) return showAuth();
+  
+  user = data;
+  username.textContent = data.username;
+  xp.textContent = `${data.xp} XP`;
+  renderRoutines(data.routines);
+  showApp();
+  loadRecent();
+}
+
+async function loadRecent() {
+  const { data } = await api('/users/recent');
+  recent.innerHTML = '';
+  (data.users || []).forEach(u => {
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.textContent = u;
+    recent.appendChild(chip);
+  });
+}
+
+function renderRoutines(routines) {
+  list.innerHTML = '';
+  
+  if (!routines.length) {
+    empty.hidden = false;
+    return;
+  }
+  
+  empty.hidden = true;
+  
+  routines.forEach(r => {
+    const clone = tpl.content.cloneNode(true);
+    const card = clone.querySelector('.routine-card');
+    card.dataset.id = r.id;
+    
+    clone.querySelector('.routine-name').textContent = r.name;
+    
+    const stepsEl = clone.querySelector('.routine-steps');
+    const steps = r.steps || [];
+    if (steps.length) {
+      steps.forEach(s => {
+        const step = document.createElement('div');
+        step.className = 'step';
+        step.textContent = s.text || s.type;
+        stepsEl.appendChild(step);
+      });
+    } else {
+      stepsEl.textContent = 'No steps';
+    }
+    
+    clone.querySelector('.btn-complete').onclick = () => completeRoutine(r.id);
+    clone.querySelector('.btn-delete').onclick = () => deleteRoutine(r.id, card);
+    
+    list.appendChild(clone);
+  });
+}
+
+async function completeRoutine(id) {
+  const { ok, data } = await api(`/routines/${id}/complete`, { method: 'POST' });
+  if (ok) {
+    const currentXP = parseInt(xp.textContent) || 0;
+    xp.textContent = `${currentXP + (data.xp_awarded || 0)} XP`;
+  }
+}
+
+async function deleteRoutine(id, card) {
+  if (!confirm('Delete this routine?')) return;
+  const { ok } = await api(`/routines/${id}`, { method: 'DELETE' });
+  if (ok) {
+    card.remove();
+    if (!list.children.length) empty.hidden = false;
+  }
+}
+
+function openModal() {
+  $('#routine-name').value = '';
+  $('#routine-steps').value = '';
+  modal.showModal();
+}
+
+showSignup.onclick = () => {
+  loginForm.hidden = true;
+  signupForm.hidden = false;
+  authError.hidden = true;
+};
+
+showLogin.onclick = () => {
+  signupForm.hidden = true;
+  loginForm.hidden = false;
+  authError.hidden = true;
+};
+
+loginForm.onsubmit = async e => {
+  e.preventDefault();
+  const username = $('#login-user').value.trim();
+  const passcode = $('#login-pass').value.trim();
+  
+  const { ok, data } = await api('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ username, passcode })
+  });
+  
+  if (!ok) return showError(data.error || 'Login failed');
+  await loadMe();
+};
+
+signupForm.onsubmit = async e => {
+  e.preventDefault();
+  const username = $('#signup-user').value.trim();
+  const passcode = $('#signup-pass').value.trim();
+  
+  if (!/^\d{4}$/.test(passcode)) return showError('Code must be 4 digits');
+  
+  const { ok, data } = await api('/auth/signup', {
+    method: 'POST',
+    body: JSON.stringify({ username, passcode })
+  });
+  
+  if (!ok) return showError(data.error || 'Signup failed');
+  await loadMe();
+};
+
+logout.onclick = async () => {
+  await api('/auth/logout', { method: 'POST' });
+  location.reload();
+};
+
+newBtn.onclick = openModal;
+emptyBtn.onclick = openModal;
+modalCancel.onclick = () => modal.close();
+
+routineForm.onsubmit = async e => {
+  e.preventDefault();
+  const name = $('#routine-name').value.trim();
+  const stepsText = $('#routine-steps').value;
+  const steps = stepsText.split('\n').map(s => s.trim()).filter(Boolean).map(text => ({ type: 'note', text }));
+  
+  const { ok } = await api('/routines', {
+    method: 'POST',
+    body: JSON.stringify({ name, steps })
+  });
+  
+  if (ok) {
+    modal.close();
+    await loadMe();
+  }
+};
+
+loadMe();
 })();
