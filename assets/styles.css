@@ -49,11 +49,19 @@ input, textarea {
   outline: none;
 }
 
-.auth {
+#auth {
   min-height: 100vh;
   display: grid;
   place-items: center;
   padding: 20px;
+}
+
+#auth[hidden] {
+  display: none;
+}
+
+#app[hidden] {
+  display: none;
 }
 
 .auth-card {
@@ -155,7 +163,7 @@ input, textarea {
   text-align: center;
 }
 
-.app {
+#app {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
