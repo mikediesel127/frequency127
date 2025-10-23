@@ -24,6 +24,7 @@ const builderClose = $('#builder-close');
 const builderCancel = $('#builder-cancel');
 const builderSave = $('#builder-save');
 const builderRoutineName = $('#builder-routine-name');
+const builderIsPublic = $('#builder-is-public');
 const builderStepsList = $('#builder-steps-list');
 
 const runnerModal = $('#runner-modal');
@@ -36,6 +37,27 @@ const runnerTotal = $('#runner-total');
 
 const stepItemTpl = $('#step-item-tpl');
 const routineCardTpl = $('#routine-card-tpl');
+
+const settingsBtn = $('#settings-btn');
+const settingsModal = $('#settings-modal');
+const settingsClose = $('#settings-close');
+const settingsDone = $('#settings-done');
+
+const addFriendBtn = $('#add-friend-btn');
+const addFriendModal = $('#add-friend-modal');
+const addFriendClose = $('#add-friend-close');
+const addFriendCancel = $('#add-friend-cancel');
+const addFriendSubmit = $('#add-friend-submit');
+const friendUsername = $('#friend-username');
+const friendError = $('#friend-error');
+const friendsList = $('#friends-list');
+
+const discoverBtn = $('#discover-btn');
+const discoverModal = $('#discover-modal');
+const discoverClose = $('#discover-close');
+const discoverDone = $('#discover-done');
+const publicRoutinesList = $('#public-routines-list');
+const discoverEmpty = $('#discover-empty');
 
 let user = null;
 let currentRoutineId = null;
@@ -85,13 +107,15 @@ function showError(msg) {
 async function loadMe() {
   const { ok, data } = await api('/auth/me');
   if (!ok) return showAuth();
-  
+
   user = data;
   username.textContent = data.username;
   xp.textContent = data.xp;
   renderRoutines(data.routines || []);
+  applyTheme(data.theme || 'dark');
   showApp();
   loadRecent();
+  loadFriends();
 }
 
 async function loadRecent() {
@@ -103,6 +127,109 @@ async function loadRecent() {
     chip.textContent = u;
     recent.appendChild(chip);
   });
+}
+
+async function loadFriends() {
+  const { data } = await api('/friends');
+  friendsList.innerHTML = '';
+  (data.friends || []).forEach(f => {
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.textContent = f.username;
+    chip.style.cursor = 'pointer';
+    chip.title = 'Click to remove';
+    chip.onclick = () => removeFriend(f.id, chip);
+    friendsList.appendChild(chip);
+  });
+
+  if (!data.friends || !data.friends.length) {
+    friendsList.innerHTML = '<span style="color: var(--text-muted); font-size: 13px;">No friends yet</span>';
+  }
+}
+
+async function removeFriend(friendId, chipElement) {
+  if (!confirm('Remove this friend?')) return;
+  const { ok } = await api(`/friends/${friendId}`, { method: 'DELETE' });
+  if (ok) {
+    chipElement.remove();
+    if (!friendsList.children.length) {
+      friendsList.innerHTML = '<span style="color: var(--text-muted); font-size: 13px;">No friends yet</span>';
+    }
+  }
+}
+
+function applyTheme(theme) {
+  document.body.setAttribute('data-theme', theme);
+  document.querySelectorAll('.theme-option').forEach(opt => {
+    opt.classList.toggle('active', opt.dataset.theme === theme);
+  });
+}
+
+async function setTheme(theme) {
+  applyTheme(theme);
+  await api('/auth/theme', {
+    method: 'POST',
+    body: JSON.stringify({ theme })
+  });
+}
+
+async function openDiscoverModal() {
+  const { data } = await api('/routines/public');
+  publicRoutinesList.innerHTML = '';
+
+  if (!data.routines || !data.routines.length) {
+    discoverEmpty.hidden = false;
+    publicRoutinesList.hidden = true;
+  } else {
+    discoverEmpty.hidden = true;
+    publicRoutinesList.hidden = false;
+
+    data.routines.forEach(r => {
+      const clone = routineCardTpl.content.cloneNode(true);
+      const card = clone.querySelector('.routine-card');
+
+      clone.querySelector('.routine-name').textContent = r.name;
+      clone.querySelector('.step-count').textContent = `${r.steps.length} steps • by ${r.username}`;
+
+      const preview = clone.querySelector('.routine-steps-preview');
+      r.steps.slice(0, 3).forEach(s => {
+        const stepDiv = document.createElement('div');
+        stepDiv.className = 'step-preview';
+        stepDiv.innerHTML = `<span>${STEP_ICONS[s.type] || '📝'}</span><span>${s.content ? s.content.slice(0, 40) + '...' : STEP_LABELS[s.type]}</span>`;
+        preview.appendChild(stepDiv);
+      });
+
+      const actions = clone.querySelector('.routine-actions');
+      actions.innerHTML = '';
+
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'btn-icon run-btn';
+      copyBtn.title = 'Copy to My Routines';
+      copyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M5 2h8v8M2 5h8v8H2V5z" stroke="currentColor" stroke-width="1.5"/></svg>';
+      copyBtn.onclick = () => copyRoutine(r);
+      actions.appendChild(copyBtn);
+
+      publicRoutinesList.appendChild(clone);
+    });
+  }
+
+  discoverModal.showModal();
+}
+
+async function copyRoutine(routine) {
+  const { ok } = await api('/routines', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: routine.name + ' (Copy)',
+      steps: routine.steps
+    })
+  });
+
+  if (ok) {
+    alert('Routine copied to your collection!');
+    discoverModal.close();
+    await loadMe();
+  }
 }
 
 function renderRoutines(routines) {
@@ -147,6 +274,7 @@ function openBuilder(routine = null) {
   currentRoutineId = routine ? routine.id : null;
   builderTitle.textContent = routine ? 'Edit Routine' : 'New Routine';
   builderRoutineName.value = routine ? routine.name : '';
+  builderIsPublic.checked = routine ? routine.is_public : false;
   builderSteps = routine ? [...routine.steps] : [];
   renderBuilderSteps();
   builderModal.showModal();
@@ -225,26 +353,27 @@ async function saveRoutine() {
     alert('Please enter a routine name');
     return;
   }
-  
+
   if (!builderSteps.length) {
     alert('Please add at least one step');
     return;
   }
-  
+
   const steps = builderSteps.filter(s => s.content.trim());
-  
+  const is_public = builderIsPublic.checked ? 1 : 0;
+
   if (currentRoutineId) {
     await api(`/routines/${currentRoutineId}`, {
       method: 'PUT',
-      body: JSON.stringify({ name, steps })
+      body: JSON.stringify({ name, steps, is_public })
     });
   } else {
     await api('/routines', {
       method: 'POST',
-      body: JSON.stringify({ name, steps })
+      body: JSON.stringify({ name, steps, is_public })
     });
   }
-  
+
   builderModal.close();
   await loadMe();
 }
@@ -313,35 +442,28 @@ function showRunnerStep(index) {
 function renderAffirmation(content) {
   const container = document.createElement('div');
   container.className = 'runner-affirmation';
-  
-  const baseText = document.createElement('div');
-  baseText.className = 'runner-affirmation-base';
-  baseText.textContent = content;
-  
-  const overlayText = document.createElement('div');
-  overlayText.className = 'runner-affirmation-overlay';
-  overlayText.textContent = content;
-  
-  container.appendChild(baseText);
-  container.appendChild(overlayText);
-  runnerStep.appendChild(container);
-  
-  const duration = Math.max(content.length * 80, 3000);
-  let progress = 0;
-  
-  function animate() {
-    progress += 10;
-    const percentage = Math.min((progress / duration) * 100, 100);
-    overlayText.style.clipPath = `inset(0 ${100 - percentage}% 0 0)`;
-    
-    if (progress < duration) {
-      runnerState.intervalId = setTimeout(animate, 10);
-    } else {
-      runnerState.intervalId = null;
+
+  const words = content.split(' ');
+  const delayPerWord = Math.max(200, Math.min(500, 8000 / words.length));
+
+  words.forEach((word, index) => {
+    const wordSpan = document.createElement('span');
+    wordSpan.className = 'affirmation-word';
+    wordSpan.textContent = word;
+    wordSpan.style.animationDelay = `${index * delayPerWord}ms`;
+    container.appendChild(wordSpan);
+
+    if (index < words.length - 1) {
+      container.appendChild(document.createTextNode(' '));
     }
-  }
-  
-  animate();
+  });
+
+  runnerStep.appendChild(container);
+
+  const totalDuration = words.length * delayPerWord + 800;
+  runnerState.intervalId = setTimeout(() => {
+    runnerState.intervalId = null;
+  }, totalDuration);
 }
 
 function renderBreathwork(content) {
@@ -528,6 +650,60 @@ runnerModal.addEventListener('close', () => {
     runnerState.intervalId = null;
   }
 });
+
+settingsBtn.onclick = () => {
+  applyTheme(user?.theme || 'dark');
+  settingsModal.showModal();
+};
+
+settingsClose.onclick = () => settingsModal.close();
+settingsDone.onclick = () => settingsModal.close();
+
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('theme-option') || e.target.closest('.theme-option')) {
+    const btn = e.target.classList.contains('theme-option') ? e.target : e.target.closest('.theme-option');
+    const theme = btn.dataset.theme;
+    if (theme) {
+      setTheme(theme);
+      user.theme = theme;
+    }
+  }
+});
+
+addFriendBtn.onclick = () => {
+  friendUsername.value = '';
+  friendError.hidden = true;
+  addFriendModal.showModal();
+};
+
+addFriendClose.onclick = () => addFriendModal.close();
+addFriendCancel.onclick = () => addFriendModal.close();
+
+addFriendSubmit.onclick = async () => {
+  const username = friendUsername.value.trim();
+  if (!username) {
+    friendError.textContent = 'Please enter a username';
+    friendError.hidden = false;
+    return;
+  }
+
+  const { ok, data } = await api('/friends', {
+    method: 'POST',
+    body: JSON.stringify({ username })
+  });
+
+  if (!ok) {
+    friendError.textContent = data.error || 'Failed to add friend';
+    friendError.hidden = false;
+  } else {
+    addFriendModal.close();
+    loadFriends();
+  }
+};
+
+discoverBtn.onclick = openDiscoverModal;
+discoverClose.onclick = () => discoverModal.close();
+discoverDone.onclick = () => discoverModal.close();
 
 loadMe();
 })();

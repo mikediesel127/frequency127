@@ -52,7 +52,10 @@
 <span class="xp-label">XP</span>
 </div>
 </div>
-<button id="logout" class="btn-icon-ghost">
+<button id="settings-btn" class="btn-icon-ghost" title="Settings">
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="currentColor" stroke-width="1.5"/><path d="M16.5 10a6.5 6.5 0 01-.24 1.71l1.5.87-1 1.73-1.5-.87a6.5 6.5 0 01-1.48 1.48l.87 1.5-1.73 1-.87-1.5A6.5 6.5 0 0110 16.5a6.5 6.5 0 01-1.71-.24l-.87 1.5-1.73-1 .87-1.5a6.5 6.5 0 01-1.48-1.48l-1.5.87-1-1.73 1.5-.87A6.5 6.5 0 013.5 10a6.5 6.5 0 01.24-1.71l-1.5-.87 1-1.73 1.5.87a6.5 6.5 0 011.48-1.48l-.87-1.5 1.73-1 .87 1.5A6.5 6.5 0 0110 3.5a6.5 6.5 0 011.71.24l.87-1.5 1.73 1-.87 1.5a6.5 6.5 0 011.48 1.48l1.5-.87 1 1.73-1.5.87A6.5 6.5 0 0116.5 10z" stroke="currentColor" stroke-width="1.5"/></svg>
+</button>
+<button id="logout" class="btn-icon-ghost" title="Logout">
 <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M13 3l4 4-4 4M17 7H7M7 17H3V3h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
 </button>
 </div>
@@ -60,6 +63,19 @@
 
 <main class="main">
 <aside class="sidebar">
+<div class="card glass">
+<h3 class="card-title">Friends</h3>
+<div id="friends-list" class="chips"></div>
+<button id="add-friend-btn" class="btn-ghost" style="width: 100%; margin-top: 12px; font-size: 13px;">+ Add Friend</button>
+</div>
+
+<div class="card glass">
+<h3 class="card-title">Discover</h3>
+<div id="discover-list" class="chips">
+<button id="discover-btn" class="chip">Browse Public Routines</button>
+</div>
+</div>
+
 <div class="card glass">
 <h3 class="card-title">Community</h3>
 <div id="recent" class="chips"></div>
@@ -96,6 +112,11 @@ New Routine
 <div class="builder-body">
 <div class="input-group">
 <input type="text" id="builder-routine-name" placeholder="Routine name" required>
+</div>
+
+<div style="display: flex; align-items: center; gap: 8px; margin: 16px 0; padding: 12px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: var(--radius-sm);">
+<input type="checkbox" id="builder-is-public" style="width: auto; cursor: pointer;">
+<label for="builder-is-public" style="cursor: pointer; font-size: 14px; color: var(--text); margin: 0;">Make this routine public (others can discover and copy it)</label>
 </div>
 
 <div class="steps-section">
@@ -140,6 +161,94 @@ New Routine
 <span id="runner-current">1</span> / <span id="runner-total">1</span>
 </div>
 <button id="runner-next" class="btn-primary">Next →</button>
+</div>
+</div>
+</dialog>
+
+<dialog id="settings-modal" class="modal">
+<div class="modal-content">
+<div class="modal-header">
+<h3>Settings</h3>
+<button type="button" id="settings-close" class="btn-icon-ghost">×</button>
+</div>
+
+<div class="builder-body">
+<div class="settings-section">
+<h4 style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 16px;">Theme</h4>
+<div class="theme-grid">
+<button class="theme-option" data-theme="dark">
+<div class="theme-preview" style="background: linear-gradient(135deg, #0a0e13 0%, #58a6ff 100%);"></div>
+<span>Dark</span>
+</button>
+<button class="theme-option" data-theme="light">
+<div class="theme-preview" style="background: linear-gradient(135deg, #f6f8fa 0%, #0969da 100%);"></div>
+<span>Light</span>
+</button>
+<button class="theme-option" data-theme="ocean">
+<div class="theme-preview" style="background: linear-gradient(135deg, #0a1628 0%, #38bdf8 100%);"></div>
+<span>Ocean</span>
+</button>
+<button class="theme-option" data-theme="sunset">
+<div class="theme-preview" style="background: linear-gradient(135deg, #1a0f0a 0%, #fb923c 100%);"></div>
+<span>Sunset</span>
+</button>
+<button class="theme-option" data-theme="forest">
+<div class="theme-preview" style="background: linear-gradient(135deg, #0a1409 0%, #4ade80 100%);"></div>
+<span>Forest</span>
+</button>
+<button class="theme-option" data-theme="purple">
+<div class="theme-preview" style="background: linear-gradient(135deg, #160a1e 0%, #c084fc 100%);"></div>
+<span>Purple</span>
+</button>
+</div>
+</div>
+</div>
+
+<div class="modal-footer">
+<button type="button" id="settings-done" class="btn-primary">Done</button>
+</div>
+</div>
+</dialog>
+
+<dialog id="add-friend-modal" class="modal">
+<div class="modal-content">
+<div class="modal-header">
+<h3>Add Friend</h3>
+<button type="button" id="add-friend-close" class="btn-icon-ghost">×</button>
+</div>
+
+<div class="builder-body">
+<div class="input-group">
+<input type="text" id="friend-username" placeholder="Friend's username" required>
+</div>
+<div id="friend-error" class="error" hidden></div>
+</div>
+
+<div class="modal-footer">
+<button type="button" id="add-friend-cancel" class="btn-ghost">Cancel</button>
+<button type="button" id="add-friend-submit" class="btn-primary">Add Friend</button>
+</div>
+</div>
+</dialog>
+
+<dialog id="discover-modal" class="modal">
+<div class="modal-content">
+<div class="modal-header">
+<h3>Discover Public Routines</h3>
+<button type="button" id="discover-close" class="btn-icon-ghost">×</button>
+</div>
+
+<div class="builder-body">
+<div id="public-routines-list" class="routine-grid"></div>
+<div id="discover-empty" class="empty-state" style="padding: 40px 20px;">
+<div class="empty-icon" style="font-size: 48px;">🔍</div>
+<h3 style="font-size: 18px;">No public routines yet</h3>
+<p style="font-size: 14px;">Be the first to share a routine!</p>
+</div>
+</div>
+
+<div class="modal-footer">
+<button type="button" id="discover-done" class="btn-primary">Close</button>
 </div>
 </div>
 </dialog>
