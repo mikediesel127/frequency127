@@ -17,11 +17,11 @@ The recent feature update added new database columns and tables, but the product
 
 ### Option 1: Wrangler CLI (Recommended)
 ```bash
-# Find your database name
+# Verify your database name (likely "frequency127" or "f127-db")
 wrangler d1 list
 
-# Apply migration
-wrangler d1 execute <YOUR_DATABASE_NAME> --file=migration.sql
+# Apply migration (replace with your actual database name if different)
+wrangler d1 execute frequency127 --file=migration.sql
 ```
 
 ### Option 2: Cloudflare Dashboard
