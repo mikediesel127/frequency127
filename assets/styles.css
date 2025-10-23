@@ -1150,3 +1150,176 @@ input, textarea {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* Activity Feed */
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.activity-item {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+}
+
+.activity-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--primary);
+}
+
+/* Leaderboard */
+.leaderboard-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.leaderboard-tab {
+  flex: 1;
+  padding: 12px 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.leaderboard-tab:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--primary);
+}
+
+.leaderboard-tab.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.leaderboard-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+}
+
+.leaderboard-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--primary);
+  transform: translateX(4px);
+}
+
+.leaderboard-rank {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--success) 100%);
+  color: white;
+  border-radius: 50%;
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.leaderboard-username {
+  flex: 1;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.leaderboard-stat {
+  font-weight: 700;
+  color: var(--primary);
+  font-size: 14px;
+}
+
+/* Achievements */
+.achievements-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.achievement-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+}
+
+.achievement-badge:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--primary);
+  transform: translateY(-2px);
+}
+
+.achievement-badge.locked {
+  opacity: 0.4;
+  filter: grayscale(100%);
+}
+
+.achievement-icon {
+  font-size: 32px;
+}
+
+.achievement-name {
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--text);
+}
+
+.achievement-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* Profile Modal Tweaks */
+.user-avatar {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--success) 100%);
+}
+
+#profile-routines-list.routine-grid {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
+#profile-routines-list .routine-card {
+  padding: 16px;
+}
+
+#profile-routines-list .routine-name {
+  font-size: 16px;
+}
+
+/* Login Screen Fix */
+#login-form[hidden],
+#signup-form[hidden] {
+  display: none !important;
+}

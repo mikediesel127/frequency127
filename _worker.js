@@ -28,9 +28,31 @@ async function api(req, env, route) {
     if (route === "/auth/me" && m === "GET") return me(req, env);
     if (route === "/auth/theme" && m === "POST") return updateTheme(req, env);
     if (route === "/users/recent" && m === "GET") return recent(env);
+    if (route === "/users/leaderboard" && m === "GET") return leaderboard(env);
+
+    const um = route.match(/^\/users\/([^\/]+)$/);
+    if (um && m === "GET") {
+      const username = decodeURIComponent(um[1]);
+      return getUserProfile(req, env, username);
+    }
 
     if (route === "/friends" && m === "GET") return listFriends(req, env);
     if (route === "/friends" && m === "POST") return addFriend(req, env);
+
+    if (route === "/activities" && m === "GET") return getActivities(req, env);
+    if (route === "/achievements" && m === "GET") return getAchievements(req, env);
+
+    if (route === "/settings/notifications" && m === "GET") return getNotificationSettings(req, env);
+    if (route === "/settings/notifications" && m === "POST") return updateNotificationSettings(req, env);
+
+    if (route === "/streaks" && m === "GET") return getFriendStreaks(req, env);
+    if (route === "/streaks" && m === "POST") return createFriendStreak(req, env);
+
+    const sm = route.match(/^\/streaks\/([^\/]+)$/);
+    if (sm && m === "DELETE") {
+      const id = decodeURIComponent(sm[1]);
+      return deleteFriendStreak(req, env, id);
+    }
 
     const fm = route.match(/^\/friends\/([^\/]+)$/);
     if (fm && m === "DELETE") {
@@ -425,23 +447,335 @@ async function deleteRoutine(req, env, id) {
 async function complete(req, env, id) {
   const user = await auth(req, env);
   if (!user) return json({ error: "Unauthorized" }, 401);
-  
+
   const r = await env.DB.prepare("SELECT id FROM routines WHERE id = ? AND user_id = ?").bind(id, user.id).first();
   if (!r) return json({ error: "Not found" }, 404);
-  
+
   const today = dayKey();
   const exists = await env.DB.prepare(
     "SELECT 1 FROM routine_completions WHERE routine_id = ? AND user_id = ? AND day_key = ?"
   ).bind(id, user.id, today).first();
-  
+
   if (exists) return json({ ok: true, xp_awarded: 0, already_completed: true });
-  
+
   const xp = 25;
   await env.DB.prepare(
     "INSERT INTO routine_completions (id, routine_id, user_id, day_key, created_at, xp_awarded) VALUES (?, ?, ?, ?, ?, ?)"
   ).bind(uid(), id, user.id, today, now(), xp).run();
-  
+
   await env.DB.prepare("UPDATE users SET xp = xp + ? WHERE id = ?").bind(xp, user.id).run();
-  
+
+  // Log activity
+  await env.DB.prepare(
+    "INSERT INTO user_activities (id, user_id, activity_type, activity_data, created_at) VALUES (?, ?, ?, ?, ?)"
+  ).bind(uid(), user.id, "routine_completed", JSON.stringify({ routine_id: id }), now()).run();
+
+  // Check and unlock achievements
+  await checkAchievements(env, user.id);
+
   return json({ ok: true, xp_awarded: xp });
+}
+
+async function getUserProfile(req, env, username) {
+  const requestingUser = await auth(req, env);
+
+  const targetUser = await env.DB.prepare(
+    "SELECT id, username, xp, streak, created_at FROM users WHERE username = ?"
+  ).bind(username).first();
+
+  if (!targetUser) return json({ error: "User not found" }, 404);
+
+  const routines = await env.DB.prepare(
+    "SELECT id, name, steps, created_at FROM routines WHERE user_id = ? AND is_public = 1 ORDER BY created_at DESC LIMIT 10"
+  ).bind(targetUser.id).all();
+
+  const completionCount = await env.DB.prepare(
+    "SELECT COUNT(*) as count FROM routine_completions WHERE user_id = ?"
+  ).bind(targetUser.id).first();
+
+  const achievements = await env.DB.prepare(
+    "SELECT achievement_key, unlocked_at FROM achievements WHERE user_id = ? ORDER BY unlocked_at DESC LIMIT 5"
+  ).bind(targetUser.id).all();
+
+  let isFriend = false;
+  if (requestingUser) {
+    const friendship = await env.DB.prepare(
+      "SELECT 1 FROM friends WHERE user_id = ? AND friend_id = ?"
+    ).bind(requestingUser.id, targetUser.id).first();
+    isFriend = !!friendship;
+  }
+
+  return json({
+    id: targetUser.id,
+    username: targetUser.username,
+    xp: targetUser.xp || 0,
+    streak: targetUser.streak || 0,
+    created_at: targetUser.created_at,
+    total_completions: completionCount.count || 0,
+    public_routines: routines.results.map(r => ({
+      id: r.id,
+      name: r.name,
+      steps: parseSteps(r.steps),
+      created_at: r.created_at
+    })),
+    achievements: achievements.results.map(a => ({
+      key: a.achievement_key,
+      unlocked_at: a.unlocked_at
+    })),
+    is_friend: isFriend
+  });
+}
+
+async function leaderboard(env) {
+  const topXP = await env.DB.prepare(
+    "SELECT username, xp, streak FROM users ORDER BY xp DESC LIMIT 20"
+  ).all();
+
+  const topStreak = await env.DB.prepare(
+    "SELECT username, xp, streak FROM users ORDER BY streak DESC LIMIT 20"
+  ).all();
+
+  return json({
+    top_xp: topXP.results,
+    top_streak: topStreak.results
+  });
+}
+
+async function getActivities(req, env) {
+  const user = await auth(req, env);
+  if (!user) return json({ error: "Unauthorized" }, 401);
+
+  // Get activities from friends
+  const friendIds = await env.DB.prepare(
+    "SELECT friend_id FROM friends WHERE user_id = ?"
+  ).bind(user.id).all();
+
+  if (!friendIds.results.length) {
+    return json({ activities: [] });
+  }
+
+  const ids = friendIds.results.map(f => f.friend_id);
+  const placeholders = ids.map(() => "?").join(",");
+
+  const activities = await env.DB.prepare(`
+    SELECT a.id, a.user_id, a.activity_type, a.activity_data, a.created_at, u.username
+    FROM user_activities a
+    JOIN users u ON a.user_id = u.id
+    WHERE a.user_id IN (${placeholders})
+    ORDER BY a.created_at DESC
+    LIMIT 50
+  `).bind(...ids).all();
+
+  return json({
+    activities: activities.results.map(a => ({
+      id: a.id,
+      user_id: a.user_id,
+      username: a.username,
+      type: a.activity_type,
+      data: JSON.parse(a.activity_data || "{}"),
+      created_at: a.created_at
+    }))
+  });
+}
+
+async function getAchievements(req, env) {
+  const user = await auth(req, env);
+  if (!user) return json({ error: "Unauthorized" }, 401);
+
+  const achievements = await env.DB.prepare(
+    "SELECT achievement_key, unlocked_at FROM achievements WHERE user_id = ? ORDER BY unlocked_at DESC"
+  ).bind(user.id).all();
+
+  return json({
+    achievements: achievements.results.map(a => ({
+      key: a.achievement_key,
+      unlocked_at: a.unlocked_at
+    }))
+  });
+}
+
+async function checkAchievements(env, userId) {
+  const user = await env.DB.prepare("SELECT xp, streak FROM users WHERE id = ?").bind(userId).first();
+  if (!user) return;
+
+  const completions = await env.DB.prepare(
+    "SELECT COUNT(*) as count FROM routine_completions WHERE user_id = ?"
+  ).bind(userId).first();
+
+  const achievementsToUnlock = [];
+
+  // XP milestones
+  if (user.xp >= 100) achievementsToUnlock.push("xp_100");
+  if (user.xp >= 500) achievementsToUnlock.push("xp_500");
+  if (user.xp >= 1000) achievementsToUnlock.push("xp_1000");
+
+  // Streak milestones
+  if (user.streak >= 3) achievementsToUnlock.push("streak_3");
+  if (user.streak >= 7) achievementsToUnlock.push("streak_7");
+  if (user.streak >= 30) achievementsToUnlock.push("streak_30");
+
+  // Completion milestones
+  if (completions.count >= 10) achievementsToUnlock.push("completions_10");
+  if (completions.count >= 50) achievementsToUnlock.push("completions_50");
+  if (completions.count >= 100) achievementsToUnlock.push("completions_100");
+
+  // First completion
+  if (completions.count === 1) achievementsToUnlock.push("first_routine");
+
+  // Insert achievements if not already unlocked
+  for (const key of achievementsToUnlock) {
+    await env.DB.prepare(
+      "INSERT OR IGNORE INTO achievements (id, user_id, achievement_key, unlocked_at) VALUES (?, ?, ?, ?)"
+    ).bind(uid(), userId, key, now()).run();
+  }
+}
+
+async function getNotificationSettings(req, env) {
+  const user = await auth(req, env);
+  if (!user) return json({ error: "Unauthorized" }, 401);
+
+  let settings = await env.DB.prepare(
+    "SELECT notification_enabled, notification_times, push_subscription FROM user_settings WHERE user_id = ?"
+  ).bind(user.id).first();
+
+  if (!settings) {
+    // Create default settings
+    await env.DB.prepare(
+      "INSERT INTO user_settings (user_id, notification_enabled, notification_times) VALUES (?, 0, ?)"
+    ).bind(user.id, "[]").run();
+
+    settings = {
+      notification_enabled: 0,
+      notification_times: "[]",
+      push_subscription: null
+    };
+  }
+
+  return json({
+    enabled: settings.notification_enabled === 1,
+    times: JSON.parse(settings.notification_times || "[]"),
+    has_subscription: !!settings.push_subscription
+  });
+}
+
+async function updateNotificationSettings(req, env) {
+  const user = await auth(req, env);
+  if (!user) return json({ error: "Unauthorized" }, 401);
+
+  const { enabled, times, push_subscription } = await readJSON(req);
+
+  // Ensure settings row exists
+  await env.DB.prepare(
+    "INSERT OR IGNORE INTO user_settings (user_id, notification_enabled, notification_times) VALUES (?, 0, ?)"
+  ).bind(user.id, "[]").run();
+
+  const updates = [];
+  const bindings = [];
+
+  if (enabled !== undefined) {
+    updates.push("notification_enabled = ?");
+    bindings.push(enabled ? 1 : 0);
+  }
+  if (times !== undefined) {
+    updates.push("notification_times = ?");
+    bindings.push(JSON.stringify(times));
+  }
+  if (push_subscription !== undefined) {
+    updates.push("push_subscription = ?");
+    bindings.push(push_subscription ? JSON.stringify(push_subscription) : null);
+  }
+
+  if (updates.length > 0) {
+    bindings.push(user.id);
+    await env.DB.prepare(`UPDATE user_settings SET ${updates.join(", ")} WHERE user_id = ?`).bind(...bindings).run();
+  }
+
+  return json({ ok: true });
+}
+
+async function getFriendStreaks(req, env) {
+  const user = await auth(req, env);
+  if (!user) return json({ error: "Unauthorized" }, 401);
+
+  const streaks = await env.DB.prepare(`
+    SELECT fs.id, fs.friend_id, fs.routine_id, fs.current_streak, fs.best_streak,
+           fs.shared_notification_times, fs.notify_on_completion,
+           u.username, r.name as routine_name
+    FROM friend_streaks fs
+    JOIN users u ON fs.friend_id = u.id
+    JOIN routines r ON fs.routine_id = r.id
+    WHERE fs.user_id = ?
+    ORDER BY fs.current_streak DESC
+  `).bind(user.id).all();
+
+  return json({
+    streaks: streaks.results.map(s => ({
+      id: s.id,
+      friend_id: s.friend_id,
+      friend_username: s.username,
+      routine_id: s.routine_id,
+      routine_name: s.routine_name,
+      current_streak: s.current_streak,
+      best_streak: s.best_streak,
+      notification_times: JSON.parse(s.shared_notification_times || "[]"),
+      notify_on_completion: s.notify_on_completion === 1
+    }))
+  });
+}
+
+async function createFriendStreak(req, env) {
+  const user = await auth(req, env);
+  if (!user) return json({ error: "Unauthorized" }, 401);
+
+  const { friend_id, routine_id, notification_times, notify_on_completion } = await readJSON(req);
+
+  if (!friend_id || !routine_id) {
+    return json({ error: "friend_id and routine_id required" }, 400);
+  }
+
+  // Verify friendship
+  const friendship = await env.DB.prepare(
+    "SELECT 1 FROM friends WHERE user_id = ? AND friend_id = ?"
+  ).bind(user.id, friend_id).first();
+
+  if (!friendship) {
+    return json({ error: "Not friends with this user" }, 400);
+  }
+
+  // Check if streak already exists
+  const existing = await env.DB.prepare(
+    "SELECT id FROM friend_streaks WHERE user_id = ? AND friend_id = ? AND routine_id = ?"
+  ).bind(user.id, friend_id, routine_id).first();
+
+  if (existing) {
+    return json({ error: "Streak already exists" }, 409);
+  }
+
+  const id = uid();
+  await env.DB.prepare(`
+    INSERT INTO friend_streaks
+    (id, user_id, friend_id, routine_id, current_streak, best_streak, shared_notification_times, notify_on_completion, created_at)
+    VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?)
+  `).bind(
+    id,
+    user.id,
+    friend_id,
+    routine_id,
+    JSON.stringify(notification_times || []),
+    notify_on_completion ? 1 : 0,
+    now()
+  ).run();
+
+  return json({ ok: true, id });
+}
+
+async function deleteFriendStreak(req, env, streakId) {
+  const user = await auth(req, env);
+  if (!user) return json({ error: "Unauthorized" }, 401);
+
+  await env.DB.prepare(
+    "DELETE FROM friend_streaks WHERE id = ? AND user_id = ?"
+  ).bind(streakId, user.id).run();
+
+  return json({ ok: true });
 }

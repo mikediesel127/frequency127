@@ -70,9 +70,15 @@
 </div>
 
 <div class="card glass">
+<h3 class="card-title">Activity Feed</h3>
+<div id="activity-feed" class="activity-list"></div>
+</div>
+
+<div class="card glass">
 <h3 class="card-title">Discover</h3>
 <div id="discover-list" class="chips">
 <button id="discover-btn" class="chip">Browse Public Routines</button>
+<button id="leaderboard-btn" class="chip">Leaderboard</button>
 </div>
 </div>
 
@@ -202,6 +208,24 @@ New Routine
 </button>
 </div>
 </div>
+
+<div class="settings-section" style="margin-top: 24px;">
+<h4 style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 16px;">Notifications</h4>
+<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+<input type="checkbox" id="notifications-enabled" style="width: auto; cursor: pointer;">
+<label for="notifications-enabled" style="cursor: pointer; font-size: 14px; color: var(--text); margin: 0;">Enable push notifications</label>
+</div>
+<div id="notification-times-section" hidden>
+<p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Daily reminder times:</p>
+<div id="notification-times-list"></div>
+<button type="button" id="add-notification-time" class="btn-ghost" style="width: 100%; margin-top: 8px; font-size: 13px;">+ Add Time</button>
+</div>
+</div>
+
+<div class="settings-section" style="margin-top: 24px;">
+<h4 style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 16px;">Achievements</h4>
+<div id="achievements-list" class="achievements-grid"></div>
+</div>
 </div>
 
 <div class="modal-footer">
@@ -249,6 +273,83 @@ New Routine
 
 <div class="modal-footer">
 <button type="button" id="discover-done" class="btn-primary">Close</button>
+</div>
+</div>
+</dialog>
+
+<dialog id="user-profile-modal" class="modal">
+<div class="modal-content">
+<div class="modal-header">
+<h3 id="profile-username">User Profile</h3>
+<button type="button" id="profile-close" class="btn-icon-ghost">×</button>
+</div>
+
+<div class="builder-body">
+<div style="text-align: center; margin-bottom: 24px;">
+<div class="user-avatar" style="width: 80px; height: 80px; border-radius: 50%; background: var(--accent); margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 800; color: var(--bg);" id="profile-avatar">A</div>
+<div style="display: flex; gap: 24px; justify-content: center; margin-top: 16px;">
+<div>
+<div style="font-size: 24px; font-weight: 800; color: var(--text);" id="profile-xp">0</div>
+<div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">XP</div>
+</div>
+<div>
+<div style="font-size: 24px; font-weight: 800; color: var(--text);" id="profile-streak">0</div>
+<div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Streak</div>
+</div>
+<div>
+<div style="font-size: 24px; font-weight: 800; color: var(--text);" id="profile-completions">0</div>
+<div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Completions</div>
+</div>
+</div>
+</div>
+
+<div id="profile-add-friend-section" hidden style="margin-bottom: 16px;">
+<button type="button" id="profile-add-friend-btn" class="btn-primary" style="width: 100%;">Add Friend</button>
+</div>
+
+<div class="settings-section">
+<h4 style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 12px;">Public Routines</h4>
+<div id="profile-routines-list" class="routine-grid"></div>
+<div id="profile-no-routines" hidden style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 14px;">No public routines yet</div>
+</div>
+
+<div class="settings-section" style="margin-top: 20px;">
+<h4 style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 12px;">Achievements</h4>
+<div id="profile-achievements-list" class="achievements-grid"></div>
+<div id="profile-no-achievements" hidden style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 14px;">No achievements unlocked yet</div>
+</div>
+</div>
+
+<div class="modal-footer">
+<button type="button" id="profile-done" class="btn-primary">Close</button>
+</div>
+</div>
+</dialog>
+
+<dialog id="leaderboard-modal" class="modal">
+<div class="modal-content">
+<div class="modal-header">
+<h3>Leaderboard</h3>
+<button type="button" id="leaderboard-close" class="btn-icon-ghost">×</button>
+</div>
+
+<div class="builder-body">
+<div class="leaderboard-tabs">
+<button class="leaderboard-tab active" data-tab="xp">Top XP</button>
+<button class="leaderboard-tab" data-tab="streak">Top Streak</button>
+</div>
+
+<div id="leaderboard-xp" class="leaderboard-content">
+<div id="leaderboard-xp-list" class="leaderboard-list"></div>
+</div>
+
+<div id="leaderboard-streak" class="leaderboard-content" hidden>
+<div id="leaderboard-streak-list" class="leaderboard-list"></div>
+</div>
+</div>
+
+<div class="modal-footer">
+<button type="button" id="leaderboard-done" class="btn-primary">Close</button>
 </div>
 </div>
 </dialog>
