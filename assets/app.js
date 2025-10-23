@@ -59,7 +59,36 @@ const discoverDone = $('#discover-done');
 const publicRoutinesList = $('#public-routines-list');
 const discoverEmpty = $('#discover-empty');
 
+const userProfileModal = $('#user-profile-modal');
+const profileClose = $('#profile-close');
+const profileDone = $('#profile-done');
+const profileUsername = $('#profile-username');
+const profileAvatar = $('#profile-avatar');
+const profileXP = $('#profile-xp');
+const profileStreak = $('#profile-streak');
+const profileCompletions = $('#profile-completions');
+const profileRoutinesList = $('#profile-routines-list');
+const profileNoRoutines = $('#profile-no-routines');
+const profileAchievementsList = $('#profile-achievements-list');
+const profileNoAchievements = $('#profile-no-achievements');
+const profileAddFriendSection = $('#profile-add-friend-section');
+const profileAddFriendBtn = $('#profile-add-friend-btn');
+
+const leaderboardBtn = $('#leaderboard-btn');
+const leaderboardModal = $('#leaderboard-modal');
+const leaderboardClose = $('#leaderboard-close');
+const leaderboardDone = $('#leaderboard-done');
+
+const activityFeed = $('#activity-feed');
+const notificationsEnabled = $('#notifications-enabled');
+const notificationTimesSection = $('#notification-times-section');
+const notificationTimesList = $('#notification-times-list');
+const addNotificationTime = $('#add-notification-time');
+const achievementsList = $('#achievements-list');
+
 let user = null;
+let notificationSettings = { enabled: false, times: [] };
+let currentProfileUser = null;
 let currentRoutineId = null;
 let builderSteps = [];
 let runnerState = { routine: null, currentIndex: 0, intervalId: null };
@@ -76,6 +105,19 @@ const STEP_LABELS = {
   breathwork: 'Breathwork',
   timer: 'Timer',
   note: 'Note'
+};
+
+const ACHIEVEMENTS = {
+  first_routine: { icon: '🎯', name: 'First Steps', desc: 'Complete your first routine' },
+  xp_100: { icon: '⭐', name: 'Rising Star', desc: 'Earn 100 XP' },
+  xp_500: { icon: '🌟', name: 'Shining Bright', desc: 'Earn 500 XP' },
+  xp_1000: { icon: '💫', name: 'Superstar', desc: 'Earn 1000 XP' },
+  streak_3: { icon: '🔥', name: '3-Day Streak', desc: 'Maintain a 3-day streak' },
+  streak_7: { icon: '🔥🔥', name: 'Week Warrior', desc: 'Maintain a 7-day streak' },
+  streak_30: { icon: '🔥🔥🔥', name: 'Month Master', desc: 'Maintain a 30-day streak' },
+  completions_10: { icon: '✅', name: 'Getting Started', desc: 'Complete 10 routines' },
+  completions_50: { icon: '✅✅', name: 'Dedicated', desc: 'Complete 50 routines' },
+  completions_100: { icon: '✅✅✅', name: 'Unstoppable', desc: 'Complete 100 routines' }
 };
 
 async function api(path, opts = {}) {
@@ -116,6 +158,9 @@ async function loadMe() {
   showApp();
   loadRecent();
   loadFriends();
+  loadActivities();
+  loadNotificationSettings();
+  registerServiceWorker();
 }
 
 async function loadRecent() {
@@ -125,6 +170,9 @@ async function loadRecent() {
     const chip = document.createElement('span');
     chip.className = 'chip';
     chip.textContent = u;
+    chip.style.cursor = 'pointer';
+    chip.title = 'Click to view profile';
+    chip.onclick = () => openUserProfile(u);
     recent.appendChild(chip);
   });
 }
@@ -541,11 +589,11 @@ function prevStep() {
 
 async function completeRoutine() {
   const { ok, data } = await api(`/routines/${runnerState.routine.id}/complete`, { method: 'POST' });
-  
+
   if (ok && !data.already_completed) {
     const currentXP = parseInt(xp.textContent) || 0;
     xp.textContent = currentXP + (data.xp_awarded || 0);
-    
+
     runnerStep.innerHTML = `
       <div style="text-align: center;">
         <div style="font-size: 80px; margin-bottom: 20px;">🎉</div>
@@ -553,10 +601,11 @@ async function completeRoutine() {
         <p style="font-size: 20px; color: var(--text-muted); margin-bottom: 24px;">+${data.xp_awarded} XP earned</p>
       </div>
     `;
-    
+
     setTimeout(() => {
       runnerModal.close();
       loadMe();
+      loadActivities();
     }, 3000);
   } else if (data.already_completed) {
     runnerStep.innerHTML = `
@@ -566,11 +615,281 @@ async function completeRoutine() {
         <p style="font-size: 20px; color: var(--text-muted);">You've already completed this routine today</p>
       </div>
     `;
-    
+
     setTimeout(() => {
       runnerModal.close();
     }, 2000);
   }
+}
+
+async function openUserProfile(username) {
+  const { ok, data } = await api(`/users/${encodeURIComponent(username)}`);
+  if (!ok) {
+    alert('Failed to load user profile');
+    return;
+  }
+
+  currentProfileUser = data;
+  profileUsername.textContent = data.username;
+  profileAvatar.textContent = data.username.charAt(0).toUpperCase();
+  profileXP.textContent = data.xp || 0;
+  profileStreak.textContent = data.streak || 0;
+  profileCompletions.textContent = data.total_completions || 0;
+
+  // Show/hide add friend button
+  if (data.username !== user.username && !data.is_friend) {
+    profileAddFriendSection.hidden = false;
+  } else {
+    profileAddFriendSection.hidden = true;
+  }
+
+  // Render routines
+  profileRoutinesList.innerHTML = '';
+  if (data.public_routines && data.public_routines.length > 0) {
+    profileNoRoutines.hidden = true;
+    data.public_routines.forEach(r => {
+      const card = document.createElement('div');
+      card.className = 'routine-card glass';
+      card.style.cursor = 'pointer';
+      card.innerHTML = `
+        <div class="routine-header">
+          <h4 class="routine-name">${r.name}</h4>
+        </div>
+        <div class="routine-meta">
+          <span class="step-count">${r.steps.length} steps</span>
+        </div>
+      `;
+      card.onclick = () => {
+        copyRoutine(r);
+        userProfileModal.close();
+      };
+      profileRoutinesList.appendChild(card);
+    });
+  } else {
+    profileNoRoutines.hidden = false;
+  }
+
+  // Render achievements
+  profileAchievementsList.innerHTML = '';
+  if (data.achievements && data.achievements.length > 0) {
+    profileNoAchievements.hidden = true;
+    data.achievements.forEach(a => {
+      const achData = ACHIEVEMENTS[a.key];
+      if (achData) {
+        const badge = document.createElement('div');
+        badge.className = 'achievement-badge';
+        badge.innerHTML = `
+          <div class="achievement-icon">${achData.icon}</div>
+          <div class="achievement-name">${achData.name}</div>
+        `;
+        profileAchievementsList.appendChild(badge);
+      }
+    });
+  } else {
+    profileNoAchievements.hidden = false;
+  }
+
+  userProfileModal.showModal();
+}
+
+async function loadActivities() {
+  const { data } = await api('/activities');
+  activityFeed.innerHTML = '';
+
+  if (!data.activities || data.activities.length === 0) {
+    activityFeed.innerHTML = '<div style="padding: 12px; color: var(--text-muted); font-size: 13px; text-align: center;">No recent activity</div>';
+    return;
+  }
+
+  data.activities.slice(0, 10).forEach(activity => {
+    const item = document.createElement('div');
+    item.className = 'activity-item';
+    item.style.cursor = 'pointer';
+    item.onclick = () => openUserProfile(activity.username);
+
+    const timeAgo = formatTimeAgo(activity.created_at);
+
+    if (activity.type === 'routine_completed') {
+      item.innerHTML = `
+        <div style="font-size: 13px; color: var(--text);"><strong>${activity.username}</strong> completed a routine</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">${timeAgo}</div>
+      `;
+    }
+
+    activityFeed.appendChild(item);
+  });
+}
+
+function formatTimeAgo(timestamp) {
+  const now = Math.floor(Date.now() / 1000);
+  const diff = now - timestamp;
+
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+async function openLeaderboard() {
+  const { data } = await api('/users/leaderboard');
+
+  const xpList = $('#leaderboard-xp-list');
+  const streakList = $('#leaderboard-streak-list');
+
+  xpList.innerHTML = '';
+  streakList.innerHTML = '';
+
+  (data.top_xp || []).forEach((u, i) => {
+    const item = document.createElement('div');
+    item.className = 'leaderboard-item';
+    item.style.cursor = 'pointer';
+    item.onclick = () => {
+      openUserProfile(u.username);
+      leaderboardModal.close();
+    };
+    item.innerHTML = `
+      <div class="leaderboard-rank">${i + 1}</div>
+      <div class="leaderboard-username">${u.username}</div>
+      <div class="leaderboard-stat">${u.xp} XP</div>
+    `;
+    xpList.appendChild(item);
+  });
+
+  (data.top_streak || []).forEach((u, i) => {
+    const item = document.createElement('div');
+    item.className = 'leaderboard-item';
+    item.style.cursor = 'pointer';
+    item.onclick = () => {
+      openUserProfile(u.username);
+      leaderboardModal.close();
+    };
+    item.innerHTML = `
+      <div class="leaderboard-rank">${i + 1}</div>
+      <div class="leaderboard-username">${u.username}</div>
+      <div class="leaderboard-stat">${u.streak} day streak</div>
+    `;
+    streakList.appendChild(item);
+  });
+
+  leaderboardModal.showModal();
+}
+
+async function loadNotificationSettings() {
+  const { data } = await api('/settings/notifications');
+  notificationSettings = data;
+
+  notificationsEnabled.checked = data.enabled;
+  notificationTimesSection.hidden = !data.enabled;
+
+  renderNotificationTimes();
+  await loadAchievements();
+}
+
+function renderNotificationTimes() {
+  notificationTimesList.innerHTML = '';
+  notificationSettings.times.forEach((time, index) => {
+    const timeItem = document.createElement('div');
+    timeItem.style.display = 'flex';
+    timeItem.style.alignItems = 'center';
+    timeItem.style.gap = '8px';
+    timeItem.style.marginBottom = '8px';
+    timeItem.innerHTML = `
+      <input type="time" value="${time}" class="notification-time-input" data-index="${index}" style="flex: 1; padding: 8px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 14px;">
+      <button class="btn-icon-ghost remove-time-btn" data-index="${index}" style="color: var(--text-muted);">×</button>
+    `;
+    notificationTimesList.appendChild(timeItem);
+  });
+}
+
+async function saveNotificationSettings() {
+  await api('/settings/notifications', {
+    method: 'POST',
+    body: JSON.stringify(notificationSettings)
+  });
+}
+
+async function loadAchievements() {
+  const { data } = await api('/achievements');
+  achievementsList.innerHTML = '';
+
+  const unlockedKeys = new Set((data.achievements || []).map(a => a.key));
+
+  Object.entries(ACHIEVEMENTS).forEach(([key, achData]) => {
+    const unlocked = unlockedKeys.has(key);
+    const badge = document.createElement('div');
+    badge.className = 'achievement-badge' + (unlocked ? '' : ' locked');
+    badge.innerHTML = `
+      <div class="achievement-icon">${achData.icon}</div>
+      <div class="achievement-name">${achData.name}</div>
+      <div class="achievement-desc">${achData.desc}</div>
+    `;
+    achievementsList.appendChild(badge);
+  });
+}
+
+async function registerServiceWorker() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    return;
+  }
+
+  try {
+    const registration = await navigator.serviceWorker.register('/assets/sw.js');
+    console.log('Service Worker registered');
+  } catch (error) {
+    console.error('Service Worker registration failed:', error);
+  }
+}
+
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) {
+    alert('This browser does not support notifications');
+    return false;
+  }
+
+  const permission = await Notification.requestPermission();
+  if (permission === 'granted') {
+    await subscribeToPush();
+    return true;
+  }
+
+  return false;
+}
+
+async function subscribeToPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    return;
+  }
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+
+    // This is a placeholder - in production you'd use your actual VAPID public key
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array('YOUR_PUBLIC_VAPID_KEY_HERE')
+    });
+
+    await api('/settings/notifications', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...notificationSettings,
+        push_subscription: subscription
+      })
+    });
+  } catch (error) {
+    console.error('Push subscription failed:', error);
+  }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
 }
 
 showSignup.onclick = () => {
@@ -704,6 +1023,80 @@ addFriendSubmit.onclick = async () => {
 discoverBtn.onclick = openDiscoverModal;
 discoverClose.onclick = () => discoverModal.close();
 discoverDone.onclick = () => discoverModal.close();
+
+profileClose.onclick = () => userProfileModal.close();
+profileDone.onclick = () => userProfileModal.close();
+
+profileAddFriendBtn.onclick = async () => {
+  if (!currentProfileUser) return;
+
+  const { ok, data } = await api('/friends', {
+    method: 'POST',
+    body: JSON.stringify({ username: currentProfileUser.username })
+  });
+
+  if (ok) {
+    alert('Friend added!');
+    profileAddFriendSection.hidden = true;
+    loadFriends();
+  } else {
+    alert(data.error || 'Failed to add friend');
+  }
+};
+
+leaderboardBtn.onclick = openLeaderboard;
+leaderboardClose.onclick = () => leaderboardModal.close();
+leaderboardDone.onclick = () => leaderboardModal.close();
+
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('leaderboard-tab')) {
+    document.querySelectorAll('.leaderboard-tab').forEach(tab => tab.classList.remove('active'));
+    e.target.classList.add('active');
+
+    const tab = e.target.dataset.tab;
+    $('#leaderboard-xp').hidden = tab !== 'xp';
+    $('#leaderboard-streak').hidden = tab !== 'streak';
+  }
+});
+
+notificationsEnabled.onchange = async (e) => {
+  notificationSettings.enabled = e.target.checked;
+  notificationTimesSection.hidden = !e.target.checked;
+
+  if (e.target.checked) {
+    const granted = await requestNotificationPermission();
+    if (!granted) {
+      e.target.checked = false;
+      notificationSettings.enabled = false;
+      notificationTimesSection.hidden = true;
+    }
+  }
+
+  await saveNotificationSettings();
+};
+
+addNotificationTime.onclick = () => {
+  notificationSettings.times.push('09:00');
+  renderNotificationTimes();
+  saveNotificationSettings();
+};
+
+document.addEventListener('click', async (e) => {
+  if (e.target.classList.contains('remove-time-btn')) {
+    const index = parseInt(e.target.dataset.index);
+    notificationSettings.times.splice(index, 1);
+    renderNotificationTimes();
+    await saveNotificationSettings();
+  }
+});
+
+document.addEventListener('change', async (e) => {
+  if (e.target.classList.contains('notification-time-input')) {
+    const index = parseInt(e.target.dataset.index);
+    notificationSettings.times[index] = e.target.value;
+    await saveNotificationSettings();
+  }
+});
 
 loadMe();
 })();
